@@ -1,0 +1,327 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Dialog</class>
+ <widget class="QDialog" name="Dialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>593</width>
+    <height>341</height>
+   </rect>
+  </property>
+  <property name="contextMenuPolicy">
+   <enum>Qt::NoContextMenu</enum>
+  </property>
+  <property name="windowTitle">
+   <string>Plot From File</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">#Dialog{
+	background-color: rgb(0, 0, 0);}</string>
+  </property>
+  <widget class="QPushButton" name="select">
+   <property name="geometry">
+    <rect>
+     <x>170</x>
+     <y>290</y>
+     <width>75</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">QPushButton:pressed#select{
+color:black;
+background-color:rgb(131,131,131);
+border: 2px solid rgb(131,131,131);
+border-radius: 5px
+}
+
+QPushButton#select{
+color:rgb(131,131,131);
+background-color:black;
+border: 2px solid rgb(131,131,131);
+border-radius: 5px
+}</string>
+   </property>
+   <property name="text">
+    <string>OK</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="dirName">
+   <property name="geometry">
+    <rect>
+     <x>30</x>
+     <y>35</y>
+     <width>120</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:10pt; color:#838383;&quot;&gt;Root&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="home">
+   <property name="geometry">
+    <rect>
+     <x>230</x>
+     <y>30</y>
+     <width>23</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="focusPolicy">
+    <enum>Qt::NoFocus</enum>
+   </property>
+   <property name="toolTip">
+    <string>Go to Root</string>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">QPushButton#home{
+image:url(:/dvPlotter/Pictures/home.png);
+background: black;
+
+}
+
+QPushButton:pressed#home{
+image:url(:/dvPlotter/Pictures/home.png);
+background: black;
+border: 2px rgb(131,131,131);
+border-radius: 5px
+}</string>
+   </property>
+   <property name="text">
+    <string/>
+   </property>
+  </widget>
+  <widget class="QLabel" name="Directories">
+   <property name="geometry">
+    <rect>
+     <x>30</x>
+     <y>10</y>
+     <width>89</width>
+     <height>18</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600; color:#838383;&quot;&gt;Directories:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
+  </widget>
+  <widget class="QListWidget" name="dirList">
+   <property name="geometry">
+    <rect>
+     <x>30</x>
+     <y>60</y>
+     <width>250</width>
+     <height>150</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">background-color: black;
+text-color: rgb(131,131,131);</string>
+   </property>
+   <property name="frameShape">
+    <enum>QFrame::StyledPanel</enum>
+   </property>
+   <property name="frameShadow">
+    <enum>QFrame::Plain</enum>
+   </property>
+   <property name="editTriggers">
+    <set>QAbstractItemView::NoEditTriggers</set>
+   </property>
+   <property name="wordWrap">
+    <bool>true</bool>
+   </property>
+  </widget>
+  <widget class="QLabel" name="DataSets">
+   <property name="geometry">
+    <rect>
+     <x>300</x>
+     <y>10</y>
+     <width>77</width>
+     <height>18</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:11pt; font-weight:600; color:#838383;&quot;&gt;Data Sets:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_4">
+   <property name="geometry">
+    <rect>
+     <x>360</x>
+     <y>35</y>
+     <width>47</width>
+     <height>13</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;🏠&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="back">
+   <property name="geometry">
+    <rect>
+     <x>205</x>
+     <y>30</y>
+     <width>23</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="focusPolicy">
+    <enum>Qt::NoFocus</enum>
+   </property>
+   <property name="toolTip">
+    <string>Up Level</string>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">QPushButton#back{
+image:url(:/dvPlotter/Pictures/back.png);
+background: black;
+
+}
+
+QPushButton:pressed#back{
+image:url(:/dvPlotter/Pictures/back.png);
+background: black;
+border: 2px rgb(131,131,131);
+border-radius: 5px
+}</string>
+   </property>
+   <property name="text">
+    <string/>
+   </property>
+  </widget>
+  <widget class="QListWidget" name="fileList">
+   <property name="geometry">
+    <rect>
+     <x>300</x>
+     <y>60</y>
+     <width>250</width>
+     <height>150</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">background-color: black;</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="cancel">
+   <property name="geometry">
+    <rect>
+     <x>330</x>
+     <y>290</y>
+     <width>75</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">QPushButton:pressed#cancel{
+color:black;
+background-color:rgb(131,131,131);
+border: 2px solid rgb(131,131,131);
+border-radius: 5px
+}
+
+QPushButton#cancel{
+color:rgb(131,131,131);
+background-color:black;
+border: 2px solid rgb(131,131,131);
+border-radius: 5px
+}</string>
+   </property>
+   <property name="text">
+    <string>Cancel</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="addDir">
+   <property name="geometry">
+    <rect>
+     <x>255</x>
+     <y>30</y>
+     <width>23</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="focusPolicy">
+    <enum>Qt::NoFocus</enum>
+   </property>
+   <property name="toolTip">
+    <string>Add Directory</string>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">QPushButton#addDir{
+image:url(:/dvPlotter/Pictures/add.png);
+background: black;
+
+}
+
+QPushButton:pressed#addDir{
+image:url(:/dvPlotter/Pictures/add.png);
+background: black;
+border: 2px rgb(131,131,131);
+border-radius: 5px
+}</string>
+   </property>
+   <property name="text">
+    <string/>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="refresh">
+   <property name="geometry">
+    <rect>
+     <x>180</x>
+     <y>30</y>
+     <width>23</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="toolTip">
+    <string>Refresh</string>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">QPushButton#refresh{
+image:url(:/dvPlotter/Pictures/refresh.png);
+background: black;
+
+}
+
+QPushButton:pressed#refresh{
+image:url(:/dvPlotter/Pictures/refresh.png);
+background: black;
+border: 2px rgb(131,131,131);
+border-radius: 5px
+}</string>
+   </property>
+   <property name="text">
+    <string/>
+   </property>
+  </widget>
+  <widget class="QLineEdit" name="currentFile">
+   <property name="geometry">
+    <rect>
+     <x>150</x>
+     <y>250</y>
+     <width>271</width>
+     <height>20</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label">
+   <property name="geometry">
+    <rect>
+     <x>150</x>
+     <y>230</y>
+     <width>56</width>
+     <height>14</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:10pt; color:#838383;&quot;&gt;Plot From:&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
+  </widget>
+ </widget>
+ <resources>
+  <include location="Resources/dvPlotterResources.qrc"/>
+ </resources>
+ <connections/>
+</ui>
