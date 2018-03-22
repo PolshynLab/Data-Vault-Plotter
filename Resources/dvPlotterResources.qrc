@@ -1,0 +1,14 @@
+<RCC>
+  <qresource prefix="dvPlotter">
+	<file>Pictures/add.png</file>
+	<file>Pictures/back.png</file>
+	<file>Pictures/browse.png</file>
+	<file>Pictures/home.png</file>
+	<file>Pictures/refresh.png</file>
+	<file>Pictures/save.png</file>
+	<file>Pictures/SessionSelect.png</file>
+	<file>Pictures/sigma.png</file>
+	<file>Pictures/zoom.png</file>
+	<file>Pictures/remove.png</file>
+  </qresource>
+</RCC>
