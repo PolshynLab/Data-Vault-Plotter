@@ -62,6 +62,9 @@ border-radius: 5px
    </property>
   </widget>
   <widget class="QPushButton" name="plotSavedBtn">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="geometry">
     <rect>
      <x>15</x>
@@ -69,6 +72,9 @@ border-radius: 5px
      <width>75</width>
      <height>36</height>
     </rect>
+   </property>
+   <property name="toolTip">
+    <string>Functionality disabled for now. Plot Live will pull up previous datasets if needed.</string>
    </property>
    <property name="styleSheet">
     <string notr="true">QPushButton:pressed#plotSavedBtn{
