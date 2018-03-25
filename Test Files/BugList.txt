@@ -1,0 +1,13 @@
+List of bugs:
+
+Sometimes plotsetup accept doesn't work, doesn't go to extents (livePlot) (Not explicitly fixed, but
+hasn't appeared in a while)
+
+plotSetup shuts down randomly. Only happens when trying to setup plots while other plots are running
+and being updated, but otherwise no correlations noticed. 
+
+Remove plot doesn't work in setup window (just not yet implemented)
+
+Todo list:
+Stop from autoresizing every time graph reloads
+Generally look at Sasha's plotter and take those options over
