@@ -10,4 +10,6 @@ Remove plot doesn't work in setup window (just not yet implemented)
 
 Todo list:
 Stop from autoresizing every time graph reloads
-Generally look at Sasha's plotter and take those options over
+Be able to change plot titles
+Figure out plotting same axes
+Each time plotLive is clicked, refresh data vaut 

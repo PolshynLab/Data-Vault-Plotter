@@ -86,7 +86,7 @@ def mesh(vfixed, offset, drange, nrange, fixed="vb", pxsize=(100, 100), delta=0.
     return np.dstack((v_fast, v_slow)), np.dstack((p0, n0))
 
 def create_file(dv): # try kwarging the vfixed
-
+    #dv.cd('Test Folder')
     dv.new("Test plot", ("i", "j", 'V1', 'V2'),
            ('Cs', 'Ds', 'p0', 'n0', 'X', 'Y', 't'))
            
@@ -98,7 +98,6 @@ def create_file(dv): # try kwarging the vfixed
     dv.add_parameter('p0_rng', (10.0,-8.0))
 
 def main():
-
     # Connections and Instrument Configurations
     cxn = labrad.connect()
     reg = cxn.registry
@@ -152,7 +151,7 @@ def main():
         totdata = np.array([j, ii, vec_x, vec_y, d_cap, d_dis, md, mn, data_x, data_y, t1])
         dv.add(totdata.T)
         
-        time.sleep(0.5)
+        time.sleep(2)
     print("it took {} s. to write data".format(time.time() - t0))
 
 

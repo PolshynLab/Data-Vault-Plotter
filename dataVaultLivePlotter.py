@@ -31,7 +31,7 @@ Ui_DirExp, QtBaseClass = uic.loadUiType(dirExplorerGUI)
 Ui_EditDataInfo, QtBaseClass = uic.loadUiType(editInfoGUI)
 Ui_PlotSetup, QtBaseClass = uic.loadUiType(plotSetupUI)
 
-ID_NEWDATA = 00002
+ID_NEWDATA = 999
 
 class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
     def __init__(self, reactor, parent = None):
@@ -165,9 +165,7 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
         return d
         
     def closePlotter(self, e):
-        self.reactor.stop()
         self.close()
-        print 'Reactor shut down.'
 
     def closeEvent(self, e):
         self.reactor.stop()
@@ -332,8 +330,8 @@ class plot2DWindow(QtGui.QDialog):
             yield self.dv.cd(self.dir)
             yield self.dv.open(self.fileName)
             newData = yield self.dv.get()
-
-            if len(newData) != 0:
+            
+            if newData != []:
                 inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex])
                 newData = np.delete(np.asarray(newData), inx, axis = 1)
                 x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.xIndex)[0][0]
@@ -352,7 +350,7 @@ class plot2DWindow(QtGui.QDialog):
             ID_NEWDATA = ID_NEWDATA + 1
             yield self.dv.signal__data_available(id)
             yield self.dv.addListener(listener=self.updatePlot, source=None, ID=id)
-            print 'Listener nominally added with ID: ' + str(id)
+            print '2D listener added with ID: ' + str(id)
 
         except Exception as inst:
             print 'Following error was thrown: '
@@ -490,44 +488,51 @@ class plot1DWindow(QtGui.QDialog):
     
     @inlineCallbacks
     def setupListener(self, c):
-        from labrad.wrappers import connectAsync
-        self.cxn = yield connectAsync(name = '1DPlot')
-        self.dv = yield self.cxn.data_vault
-        yield self.dv.cd(self.dir)
-        yield self.dv.open(self.fileName)
-        
-        global ID_NEWDATA
-        id = ID_NEWDATA
-        ID_NEWDATA = ID_NEWDATA + 1
-        yield self.dv.signal__data_available(id)
-        yield self.dv.addListener(listener=self.updatePlot, source=None, ID=id)
-        
-        if self.fresh == 1:
-            newData = yield self.dv.get()
+        try: 
+            from labrad.wrappers import connectAsync
+            self.cxn = yield connectAsync(name = '1DPlot')
+            self.dv = yield self.cxn.data_vault
+            yield self.dv.cd(self.dir)
+            yield self.dv.open(self.fileName)
             
-            inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex])
-            newData = np.delete(np.asarray(newData), inx, axis = 1)
+            global ID_NEWDATA
+            id = ID_NEWDATA
+            ID_NEWDATA = ID_NEWDATA + 1
+            yield self.dv.signal__data_available(id)
+            yield self.dv.addListener(listener=self.updatePlot, source=None, ID=id)
+            print '1D Listener added with ID: ' + str(id)
             
-            x_ind = np.where(np.sort([self.xIndex, self.yIndex]) == self.xIndex)[0][0]
-            y_ind = np.where(np.sort([self.xIndex, self.yIndex]) == self.yIndex)[0][0]
+            if self.fresh == 1:
+                newData = yield self.dv.get()
+                
+                inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex])
+                newData = np.delete(np.asarray(newData), inx, axis = 1)
+                
+                x_ind = np.where(np.sort([self.xIndex, self.yIndex]) == self.xIndex)[0][0]
+                y_ind = np.where(np.sort([self.xIndex, self.yIndex]) == self.yIndex)[0][0]
 
-            self.Data = newData
-            self.isData = True
-            self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
-            
-            if len(self.binned) > 2:
-                p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
-                if len(p) != 0:
-                    xVals = newData[p[-1][0]+1::, x_ind]
-                    yVals = newData[p[-1][0]+1::, y_ind]
+                self.Data = newData
+                self.isData = True
+                self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+                
+                if len(self.binned) > 2:
+                    p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+                    if len(p) != 0:
+                        xVals = newData[p[-1][0]+1::, x_ind]
+                        yVals = newData[p[-1][0]+1::, y_ind]
+                    else:
+                        xVals, yVals = newData[::, x_ind], newData[::, y_ind]
+                    
                 else:
                     xVals, yVals = newData[::, x_ind], newData[::, y_ind]
-                
-            else:
-                xVals, yVals = newData[::, x_ind], newData[::, y_ind]
 
-            self.plot1D.clear()
-            self.plot1D.plot(x = xVals, y = yVals, pen =pg.mkPen(color=(0,255,255)))
+                self.plot1D.clear()
+                self.plot1D.plot(x = xVals, y = yVals, pen =pg.mkPen(color=(0,255,255)))
+        except Exception as inst:
+            print 'Following error was thrown: '
+            print inst
+            print 'Error thrown on line: '
+            print sys.exc_traceback.tb_lineno 
 
     @inlineCallbacks
     def updatePlot(self, c, signal):
