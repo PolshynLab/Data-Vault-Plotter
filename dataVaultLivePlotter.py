@@ -577,7 +577,7 @@ class plot1DWindow(QtGui.QDialog):
 
 	@inlineCallbacks
 	def updatePlot(self, c, signal):
-		print 'here'
+
 		newData = yield self.dv.get()
 		inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex])
 		newData = np.delete(np.asarray(newData), inx, axis = 1)
