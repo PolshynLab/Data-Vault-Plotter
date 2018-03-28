@@ -315,7 +315,7 @@ class plot2DWindow(QtGui.QDialog):
 			self.pX, self.pY = x0, y0
 			self.extents = [self.plotInfo['x range'][0], self.plotInfo['x range'][1], self.plotInfo['y range'][0], self.plotInfo['y range'][1]]
 			self.pxsize = [self.plotInfo['x points'], self.plotInfo['y points']]
-			
+			self.setWindowTitle(str(self.plotInfo['title']))
 
 			self.Data = np.array([])
 			
@@ -486,7 +486,7 @@ class plot1DWindow(QtGui.QDialog):
 		
 		self.isData = False
 		self.Data = np.array([])
-		
+		self.setWindowTitle(str(self.plotInfo['title']))
 		self.xIndex = self.plotInfo['x index']
 		self.yIndex = self.plotInfo['y index']
 		
