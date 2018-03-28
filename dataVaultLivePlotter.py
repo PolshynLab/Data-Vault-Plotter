@@ -771,6 +771,7 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 		
 		self.plot2DInfo = {}
 		self.plot1DInfo = {}
+		self.num1Plots, self.num2Plots = 0, 0
 		
 		self.popAxes(self.reactor)
 		
@@ -812,7 +813,7 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 		
 		headers = [lbl1, x1, y1, lbl2, x2, y2, z2]
 		
-		num1.setText('Plot')		
+		num1.setText('Plot')
 		num1.setTextColor(QtGui.QColor(131,131,131))
 		num2.setText('Plot')
 		num2.setTextColor(QtGui.QColor(131,131,131))
@@ -892,7 +893,9 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 		lbl, xAx, yAx = QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem()
 		self.onePlots.insertRow(self.onePlots.rowCount())
 		
-		title = 'Plot '+ str(self.onePlots.rowCount() - 1)
+		self.num1Plots += 1
+		title = 'Plot '+ str(self.num1Plots)
+		
 		lbl.setText(title)
 		xAx.setText(self.x1.currentText())
 		yAx.setText(self.y1.currentText())
@@ -906,7 +909,7 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 					'y index': self.y1.currentIndex()
 					}
 		
-		self.plot1DInfo[title] = plotInfo
+		self.plot1DInfo[self.num1Plots] = plotInfo
 		
 		for i in range(0, 3):
 			self.onePlots.setItem(self.onePlots.rowCount() - 1, i, newItems[i])
@@ -916,7 +919,9 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 		lbl, xAx, yAx, zAx = QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem()
 		self.twoPlots.insertRow(self.twoPlots.rowCount())
 		
-		title = 'Plot '+ str(self.twoPlots.rowCount() - 1)
+		self.num2Plots += 1
+		title = 'Plot '+ str(self.num2Plots)
+		
 		lbl.setText(title)
 		xAx.setText(self.x2.currentText())
 		yAx.setText(self.y2.currentText())
@@ -933,19 +938,29 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 					'z index': self.z2.currentIndex(),
 					}
 		
-		self.plot2DInfo[title] = plotInfo
+		self.plot2DInfo[self.num2Plots] = plotInfo
 		
 		for i in range(0, 4):
 			self.twoPlots.setItem(self.twoPlots.rowCount() - 1, i, newItems[i])
 		self.formatTable(2)
 		
 	def rmv1DPlot(self):
-		r = self.onePlots.currentRow()
+		r = int(self.onePlots.currentRow())
+		self.plot1DInfo.pop(r, None)
 		self.onePlots.removeRow(r)
+		if r != self.num1Plots:
+			for i in range(r+1, self.num1Plots+1):
+				self.plot1DInfo[i - 1] = self.plot1DInfo.pop(i)
+		self.num1Plots -= 1
 		
 	def rmv2DPlot(self):
-		r = self.twoPlots.currentRow()
+		r = int(self.twoPlots.currentRow())
+		self.plot2DInfo.pop(r, None)
 		self.twoPlots.removeRow(r)
+		if r != self.num2Plots:
+			for i in range(r+1, self.num2Plots+1):
+				self.plot2DInfo[i - 1] = self.plot2DInfo.pop(i)
+		self.num2Plots -= 1
 		
 	@inlineCallbacks
 	def popAxes(self, c = None):
@@ -973,12 +988,13 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 			
 	@inlineCallbacks
 	def initPlot(self, c = None):
-		'''
+		
 		for r in range(1, self.onePlots.rowCount()):
-			self.plot1DInfo['title']['title'] = str(self.onePlots.item(r, 0).text())
+			self.plot1DInfo[r]['title'] = str(self.onePlots.item(r, 0).text())
+			self.plot1DInfo[str(self.onePlots.item(r, 0).text())] = self.plot1DInfo.pop(r)
 		for r in range(1, self.twoPlots.rowCount()):
-			self.plot2DInfo['title']['title'] = str(self.twoPlots.item(r, 0).text())
-		'''
+			self.plot2DInfo[r]['title'] = str(self.twoPlots.item(r, 0).text())
+			self.plot2DInfo[str(self.twoPlots.item(r, 0).text())] = self.plot2DInfo.pop(r)
 		try:
 			self.extents, self.pxsize = {},{}
 			
