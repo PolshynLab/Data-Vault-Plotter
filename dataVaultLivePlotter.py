@@ -502,6 +502,8 @@ class plot1DWindow(QtGui.QDialog):
 		self.id = ID_NEWDATA
 		ID_NEWDATA = ID_NEWDATA + 1
 		
+		self.colorWheel = [(0,114,189), (216,83,25), (237,177,32), (126,47,142), (119,172,48)]
+		self.penColor = self.colorWheel[int(self.id)%5]
 		self.resize(600,320)
 		self.move(self.pX,self.pY)
 		p = self.palette()
@@ -562,7 +564,7 @@ class plot1DWindow(QtGui.QDialog):
 				xVals, yVals = newData[::, x_ind], newData[::, y_ind]
 
 			self.plot1D.clear()
-			self.plot1D.plot(x = xVals, y = yVals, pen =pg.mkPen(color=(0,255,255)))
+			self.plot1D.plot(x = xVals, y = yVals, pen =pg.mkPen(color=self.penColor))
 		except Exception as inst:
 			print 'Following error was thrown: '
 			print inst
@@ -610,7 +612,7 @@ class plot1DWindow(QtGui.QDialog):
 				xVals, yVals = self.Data[::, x_ind], self.Data[::, y_ind]
 
 			self.plot1D.clear()
-			self.plot1D.plot(x = xVals, y = yVals, pen =pg.mkPen(color=(0,255,255)))
+			self.plot1D.plot(x = xVals, y = yVals, pen =pg.mkPen(color=self.penColor))
 		except Exception as inst:
 			print 'Following error was thrown: '
 			print inst
