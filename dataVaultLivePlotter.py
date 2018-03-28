@@ -1113,49 +1113,6 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 		print 'closing the window'
 		self.close()
 
-class editDataInfo(QtGui.QDialog, Ui_EditDataInfo):
-	def __init__(self, reactor, parent = None):
-		super(editDataInfo, self).__init__(parent)
-
-		self.reactor = reactor
-		self.setupUi(self)
-		self.window = window
-		self.dv = self.window.dv
-		self.dataSet = str(self.window.currentFile.text())
-		self.ok.clicked.connect(self.updateComments)
-		self.cancel.clicked.connect(self.exitEdit)
-		self.name.setWordWrap(True)
-		self.currentComs.setReadOnly(True)
-
-		self.setupTags(self)
-
-	@inlineCallbacks
-	def setupTags(self, c):
-		name = yield self.dv.get_name()
-		params = yield self.dv.get_parameters()
-		coms = yield self.dv.get_comments()
-		self.name.setText(name)
-		self.name.setStyleSheet("QLabel#name {color: rgb(131,131,131);}")
-		self.parameters.setText(str(params))
-		self.parameters.setStyleSheet("QLabel#parameters {color: rgb(131,131,131);}")
-		if str(coms) == '[]':
-			self.currentComs.setText("(None)")
-		else:
-			s = ""
-			for i in coms:
-				s += str(i[2]) + "\n\n" 
-			self.currentComs.setText(str(s))
-
-	@inlineCallbacks
-	def updateComments(self, c):
-		coms = str(self.comments.toPlainText())
-		if coms == '':
-			pass
-		else:
-			yield self.dv.add_comment(coms)
-		self.close()
-	def exitEdit(self):
-		self.close()
 
 class dirExplorer(QtGui.QDialog, Ui_DirExp):
 	def __init__(self, reactor, status, parent = None):
@@ -1401,9 +1358,9 @@ class dataVaultExplorer(QtGui.QDialog, Ui_DataVaultExp):
 				self.mainWin.listenPlotFile = str(self.selectedFile)
 				self.mainWin.listenTo = self.selectedDir
 				print 'Doing this'
-				livePlot = plotSetup(self.reactor,self.selectedFile, self.selectedDir, self.cxn, self.dv, 1, self.mainWin)
+				self.livePlot = plotSetup(self.reactor,self.selectedFile, self.selectedDir, self.cxn, self.dv, 1, self.mainWin)
 				self.accept()
-				livePlot.show()
+				self.livePlot.show()
 			else:
 				pass
 		else:
