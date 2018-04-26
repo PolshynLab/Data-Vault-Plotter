@@ -1,18 +1,21 @@
 from __future__ import division
 import sys
+import os
 import twisted
 from PyQt4 import QtCore, QtGui, QtTest, uic
+from jinja2 import Environment, PackageLoader
+from PyQt4.QtGui import QApplication, QPrinter
+from PyQt4.QtWebKit import QWebView
 from twisted.internet.defer import inlineCallbacks, Deferred
 import numpy as np
 import pyqtgraph as pg
+import pyqtgraph.exporters
 import exceptions
 import time
 import copy
 import datetime as dt
-import subprocess
-from subprocess import *
-
-
+import scipy.io as sio
+import scipy.stats as spst
 
 path = sys.path[0]
 
@@ -52,6 +55,8 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		self.plotLive.clicked.connect(self.plotLiveData)
 		
 		self.changeDir.setEnabled(False)
+		
+		self.plotSavedBtn.setEnabled(True)
 		
 		self.listStatus = False
 		
@@ -146,15 +151,24 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		self.allowPlot = True
 			
 	def openSavedPlots(self, file, dir, twoPlots):
+		print 'opening plots'
 		x0, y0 = 450, 25
-		for index in range(0, len(twoPlots)):
-			self.thing = plotSavedWin(self.reactor, file, dir, twoPlots[index], x0, y0)
-			self.thing.show()	 
-			y0 += 50
+		print twoPlots
+		for plot in twoPlots:
+			try:
+				self.thing = plotSavedWindow(self.reactor, file, dir, twoPlots[plot])
+				print 'got to this part'
+				self.thing.show()
+				y0 += 50
+			except Exception as inst:
+				print 'Following error was thrown: '
+				print inst
+				print 'Error thrown on line: '
+				print sys.exc_traceback.tb_lineno 
 
 	def plotLiveData(self):
-		dvExplorer = dataVaultExplorer(self.reactor, 'live', self)
-		dvExplorer.show()
+		self.dvExplorer = dataVaultExplorer(self.reactor, 'live', self)
+		self.dvExplorer.show()
 		
 	def setupListener(self):
 		self.listen.setEnabled(False)
@@ -163,16 +177,20 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		drcExplorer.show()
 		
 	def plotSavedDataFunc(self):
-
-		dvExplorer = dataVaultExplorer(self.reactor, 'saved', self)
-		dvExplorer.show()
+		print 'hi there'
+		#self.pltSaved = plotSavedWindow()
+		#self.pltSaved.show()
+		self.dvExplorer = dataVaultExplorer(self.reactor, 'saved', self)
+		self.dvExplorer.show()
 		
 	def sleep(self,secs):
 		d = Deferred()
 		self.reactor.callLater(secs,d.callback,'Sleeping')
 		return d
 		
-	def closePlotter(self, e):
+	def closePlotter(self):
+		self.reactor.stop()
+		self.cxn.disconnect()
 		self.close()
 
 	def closeEvent(self, e):
@@ -288,7 +306,7 @@ class extentPrompt(QtGui.QDialog, Ui_ExtPrompt):
 				
 	def closeEvent(self, e):
 		self.reject()
-		
+
 class plot2DWindow(QtGui.QDialog):
 	def __init__(self, reactor, plotInfo, dir, file, x0, y0, fresh, parent = None):
 		try: 
@@ -350,6 +368,7 @@ class plot2DWindow(QtGui.QDialog):
 				y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.yIndex)[0][0]
 				z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.zIndex)[0][0]
 				newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
+				print newData[::, x_ind]
 				newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
 
@@ -414,12 +433,12 @@ class plot2DWindow(QtGui.QDialog):
 			if self.extents[0] < self.extents[1]:
 				self.xBins = np.linspace(self.extents[0] - 0.5 * self.xscale, self.extents[1] + 0.5 * self.xscale, self.pxsize[0]+1)
 			else:
-				self.xBins = np.linspace(self.extents[0] + 0.5 * self.xscale, self.extents[1] - 0.5 * self.xscale, self.pxsize[0]+1)
+				self.xBins = np.linspace(self.extents[1] - 0.5 * self.xscale, self.extents[0] + 0.5 * self.xscale, self.pxsize[0]+1)
 			
 			if self.extents[2] < self.extents[3]:
 				self.yBins = np.linspace(self.extents[2] - 0.5 * self.yscale, self.extents[3] + 0.5 * self.yscale, self.pxsize[1]+1)
 			else:
-				self.yBins = np.linspace(self.extents[2] + 0.5 * self.yscale, self.extents[3] - 0.5 * self.yscale, self.pxsize[1]+1)
+				self.yBins = np.linspace(self.extents[3] - 0.5 * self.yscale, self.extents[2] + 0.5 * self.yscale, self.pxsize[1]+1)
 		
 		except Exception as inst:
 			print 'Following error was thrown: '
@@ -485,6 +504,8 @@ class plot1DWindow(QtGui.QDialog):
 		self.pX, self.pY = x0, y0
 		
 		self.isData = False
+		self.traceCnt = 0
+		self.numLines = 1
 		self.Data = np.array([])
 		self.setWindowTitle(str(self.plotInfo['title']))
 		self.xIndex = self.plotInfo['x index']
@@ -503,6 +524,7 @@ class plot1DWindow(QtGui.QDialog):
 		ID_NEWDATA = ID_NEWDATA + 1
 		
 		self.colorWheel = [(0,114,189), (216,83,25), (237,177,32), (126,47,142), (119,172,48)]
+		self.QColorWheel = [QtGui.QColor(0,114,189), QtGui.QColor(216,83,25), QtGui.QColor(237,177,32), QtGui.QColor(126,47,142), QtGui.QColor(119,172,48)]
 		self.penColor = self.colorWheel[int(self.id)%5]
 		self.resize(600,320)
 		self.move(self.pX,self.pY)
@@ -512,21 +534,72 @@ class plot1DWindow(QtGui.QDialog):
 	
 		self.layout = QtGui.QGridLayout(self)
 		
-		self.plot1D = pg.PlotWidget(title = self.plotInfo['title'])
+		self.plot1D = pg.PlotWidget()
 		self.plot1D.showAxis('right', show = True)
 		self.plot1D.showAxis('top', show = True)
 		self.plot1D.setLabel('left', self.plotInfo['y axis'])
 		self.plot1D.setLabel('bottom', self.plotInfo['x axis'])
 		self.plot1D.enableAutoRange(enable = True)
+
 		
-		self.layout.addWidget(self.plot1D, *(0,0))
+		self.traceCntBox = QtGui.QComboBox()
+		self.traceCntBox.setObjectName('traceCntBox')
+		
+
+		self.currentTraceColor = str(self.colorWheel[int(self.id)%5])
+		self.traceCntStyle = "QComboBox#traceCntBox{width: 20px; color: rgb(131,131,131); background-color: 'balck';  border: 2px solid rgb(131,131,131); border-radius: 5px;  "
+		self.styleColorTxt = 'color: rgb'+self.currentTraceColor+';}'
+		self.traceCntBox.setStyleSheet(self.traceCntStyle+self.styleColorTxt)
+		self.traceCntBox.insertItem(0, '1')
+		self.traceCntBox.insertItem(1, '2')
+		self.traceCntBox.insertItem(2, '3')
+		self.traceCntBox.insertItem(3, '4')
+		self.traceCntBox.insertItem(4, '5')
+		self.traceCntBox.setItemData(0, self.QColorWheel[int(self.id)%5], QtCore.Qt.TextColorRole)
+		self.traceCntBox.setItemData(1, self.QColorWheel[int(self.id + 1)%5], QtCore.Qt.TextColorRole)
+		self.traceCntBox.setItemData(2, self.QColorWheel[int(self.id + 2)%5], QtCore.Qt.TextColorRole)
+		self.traceCntBox.setItemData(3, self.QColorWheel[int(self.id + 3)%5], QtCore.Qt.TextColorRole)
+		self.traceCntBox.setItemData(4, self.QColorWheel[int(self.id + 4)%5], QtCore.Qt.TextColorRole)
+		self.traceCntBox.setItemData(0, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
+		self.traceCntBox.setItemData(1, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
+		self.traceCntBox.setItemData(2, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
+		self.traceCntBox.setItemData(3, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
+		self.traceCntBox.setItemData(4, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
+		
+		self.traceCntBox.currentIndexChanged.connect(self.alterColor)
+
+		self.plotTitle = QtGui.QLabel()
+		self.plotTitle.setText(self.plotInfo['title'])
+		self.plotTitle.setObjectName('plotTitle')
+		self.plotTitle.setStyleSheet("QLabel#plotTitle {color: rgb(131,131,131); font: bold 11pt;}")
+		self.traceCntLbl = QtGui.QLabel()
+		self.traceCntLbl.setText('Plot Previous Traces:')
+		self.traceCntLbl.setObjectName('traceCntLbl')
+		self.traceCntLbl.setStyleSheet("QLabel#traceCntLbl {color: rgb(131,131,131); font: 10pt;}")
+		
+		self.layout.addWidget(self.plot1D, *(1,0, 1, 50))
+		self.layout.addWidget(self.traceCntBox, *(0,43))
+		self.layout.addWidget(self.traceCntLbl, *(0,42))
+		self.layout.addWidget(self.plotTitle, *(0,9))
 		self.setLayout(self.layout)
+		
+		
 		
 		self.xScale = np.absolute((self.extents[1] - self.extents[0])/ self.pxsize)
 		if self.extents[0] < self.extents[1]:
 			self.xBins = np.linspace(self.extents[0] - 0.5*self.xScale, self.extents[1] + 0.5*self.xScale, self.pxsize + 1)
 		else:
 			self.xBins = np.linspace(self.extents[0] + 0.5*self.xScale, self.extents[1] - 0.5*self.xScale, self.pxsize + 1)
+		self.XplotData = [[],[],[],[]]
+		self.YplotData = [[],[],[],[]]
+			
+	def alterColor(self):
+		i = self.traceCntBox.currentIndex()
+		self.currentTraceColor = str(self.colorWheel[int(self.id + i)%5])
+		self.styleColorTxt = 'color: rgb'+self.currentTraceColor+';}'
+		self.traceCntBox.setStyleSheet(self.traceCntStyle+self.styleColorTxt)
+		self.traceCnt = int(i)
+		print 'Trace Count: ', self.traceCnt
 	
 	@inlineCallbacks
 	def setupListener(self, c):
@@ -603,8 +676,18 @@ class plot1DWindow(QtGui.QDialog):
 			if len(self.binned) > 2:
 				p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
 				if len(p) != 0:
-					xVals = self.Data[p[-1][0]+1::, x_ind]
-					yVals = self.Data[p[-1][0]+1::, y_ind]
+					if len(p) == self.numLines:
+						xVals = self.Data[p[-1][0]+1::, x_ind]
+						yVals = self.Data[p[-1][0]+1::, y_ind]
+					else:
+						xVals = self.Data[p[-1][0]+1::, x_ind]
+						yVals = self.Data[p[-1][0]+1::, y_ind]
+						i = 2
+						while i < np.amin((len(p), 6)):
+							self.XplotData[(i - 2)%4] = self.Data[p[-i][0]+1:p[-i + 1][0]+1, x_ind]
+							self.YplotData[(i - 2)%4] = self.Data[p[-i][0]+1:p[-i + 1][0]+1, y_ind]
+							i += 1
+						self.numLines = len(p)
 				else:
 					xVals, yVals = self.Data[::, x_ind], self.Data[::, y_ind]
 				
@@ -612,7 +695,11 @@ class plot1DWindow(QtGui.QDialog):
 				xVals, yVals = self.Data[::, x_ind], self.Data[::, y_ind]
 
 			self.plot1D.clear()
-			self.plot1D.plot(x = xVals, y = yVals, pen =pg.mkPen(color=self.penColor))
+			self.plot1D.plot(x = xVals, y = yVals, pen = pg.mkPen(color=self.penColor))
+			i = 0
+			while i < self.traceCnt and i + 1 < self.numLines:
+				self.plot1D.plot(x = self.XplotData[(i)%4], y = self.YplotData[(i)%4], pen = pg.mkPen(color = self.colorWheel[int(self.id+i+1)%5]))
+				i += 1
 		except Exception as inst:
 			print 'Following error was thrown: '
 			print inst
@@ -627,10 +714,574 @@ class plot1DWindow(QtGui.QDialog):
 		self.cxn.disconnect()
 		self.close()
 
-'''
-class plotSavedWin(QtGui.QMainWindow):
+
+class plotSavedWindow(QtGui.QWidget):
+	def __init__(self, reactor, file, dir, plotInfo):
+		super(plotSavedWindow, self).__init__()
+
+		self.reactor = reactor
+		self.file = file
+		self.dir = dir
+		self.plotInfo = plotInfo
+		print 'got to this part'
+		self.xIndex = self.plotInfo['x index']
+		self.yIndex = self.plotInfo['y index']
+		self.zIndex = self.plotInfo['z index']
+		'''
+		self.testData = np.random.normal(size = [1000, 1000])
+		self.modMat = np.arange(1000000)
+		self.modMat = np.reshape(self.modMat, (1000,1000))
+		self.testData = self.testData + self.modMat
+		'''
+		self.notes = ''
+		self.plotTitle = self.plotInfo['title']
+		
+		self.resize(800,800)
+		self.move(450, 25)
+		p = self.palette()
+		p.setColor(self.backgroundRole(), QtGui.QColor(0, 0, 0))
+		self.setPalette(p)
+
+		self.layout = QtGui.QGridLayout(self)
+		
+		self.viewBig = pg.PlotItem(name = "Plot 2D", title = self.plotTitle)
+		self.viewBig.showAxis('top', show = True)
+		self.viewBig.showAxis('right', show = True)
+		self.viewBig.setLabel('left', 'y axis')
+		self.viewBig.setLabel('bottom', 'x axis')
+		self.viewBig.setAspectLocked(lock = False, ratio = 1)
+		self.mainPlot = pg.ImageView(view = self.viewBig)
+		self.mainPlot.ui.menuBtn.hide()
+		self.mainPlot.ui.histogram.item.gradient.loadPreset('bipolar')
+		self.mainPlot.ui.roiBtn.hide()
+		self.mainPlot.ui.menuBtn.hide()
+		self.viewBig.setAspectLocked(False)
+		self.viewBig.invertY(False)
+		self.viewBig.setXRange(-1, 1)
+		self.viewBig.setYRange(-1, 1)
+		
+		'''
+		self.x0, self.y0 = -2, -2
+		self.extents = [-2, 2, -2, 2]
+		self.numPts = [1000, 1000]
+		self.xscale = float((self.extents[1] - self.extents[0])/self.numPts[0])
+		self.yscale = float((self.extents[3] - self.extents[2])/self.numPts[1])
+		
+		self.mainPlot.setImage(self.testData, autoRange = True , autoLevels = True, pos=[self.x0, self.y0],scale=[self.xscale, self.yscale])
+		'''
+		
+		self.xLine = pg.InfiniteLine(pos = 0, angle = 0, movable = True)
+		self.yLine = pg.InfiniteLine(pos = 0, angle = 90, movable = True)
+		self.viewBig.addItem(self.xLine, ignoreBounds = True)
+		self.viewBig.addItem(self.yLine, ignoreBounds =True)
+		self.xLine.sigPositionChangeFinished.connect(self.updateXLineBox)
+		self.yLine.sigPositionChangeFinished.connect(self.updateYLineBox)
+		
+		
+		self.plot1D = pg.PlotWidget()
+		self.plot1D.showAxis('right', show = True)
+		self.plot1D.showAxis('top', show = True)
+		self.plot1D.setLabel('left', 'z axis')
+		self.plot1D.setLabel('bottom', 'x axis')
+		self.plot1D.enableAutoRange(enable = True)
+		
+		self.xySelectBox = QtGui.QComboBox()
+		self.xySelectBox.setObjectName('xySelectBox')
+		self.xySelectBox.setStyleSheet("QComboBox#xySelectBox{width: 20px; color: rgb(131,131,131); background-color: 'balck';	border: 2px solid rgb(131,131,131); border-radius: 5px;}")
+		self.xySelectBox.insertItem(0, 'Horizontal')
+		self.xySelectBox.insertItem(1, 'Vertical')
+		self.xySelectBox.currentIndexChanged.connect(self.toggleXYTrace)
+		
+		self.xySelectLbl = QtGui.QLabel()
+		self.xySelectLbl.setObjectName('xySelectLbl')
+		self.xySelectLbl.setText('Line Cut Direction:')
+		self.xySelectLbl.setStyleSheet('QLabel#xySelectLbl {color: rgb(131,131,131); font: 10pt;}')
+		self.xySelectBox.setItemData(0, QtGui.QColor(131,131,131), QtCore.Qt.TextColorRole)
+		self.xySelectBox.setItemData(1, QtGui.QColor(131,131,131), QtCore.Qt.TextColorRole)
+		self.xySelectBox.setItemData(0, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
+		self.xySelectBox.setItemData(1, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
+		
+		self.tracePosLbl = QtGui.QLabel()
+		self.tracePosLbl.setObjectName('tracePosLbl')
+		self.tracePosLbl.setText('Line Cut Position:')
+		self.tracePosLbl.setStyleSheet('QLabel#tracePosLbl {color: rgb(131,131,131); font: 10pt;}')
+		
+		self.tracePosBox = QtGui.QDoubleSpinBox()
+		self.tracePosBox.setObjectName('tracePosBox')
+		self.tracePosBox.setButtonSymbols(2)
+		self.tracePosBox.setValue(0)
+		self.tracePosBox.setRange(-10, 10)
+		self.tracePosBox.setDecimals(3)
+		
+		
+		self.saveMATBtn = QtGui.QPushButton()
+		self.savePDFBtn = QtGui.QPushButton()
+		self.editNotesBtn = QtGui.QPushButton()
+		self.openDVBtn = QtGui.QPushButton()
+		self.backBtn = QtGui.QPushButton()
+		self.backBtn1 = QtGui.QPushButton()
+		
+		self.saveMatMenu = QtGui.QMenu()
+		save1D = QtGui.QAction("Save 1D trace", self)
+		save2D = QtGui.QAction("Save 2D plot", self)
+		save1D.triggered.connect(self.save1DMAT)
+		save2D.triggered.connect(self.save2DMAT)
+		self.saveMatMenu.addAction(save2D)
+		self.saveMatMenu.addAction(save1D)
+		self.saveMATBtn.setMenu(self.saveMatMenu)
+		
+		self.savePDFMenu = QtGui.QMenu()
+		pdf1D = QtGui.QAction("Save 1D trace", self)
+		pdf2D = QtGui.QAction("Save 2D plot", self)
+		pdf1D.triggered.connect(lambda: self.savePDF(1))
+		pdf2D.triggered.connect(lambda: self.savePDF(2))
+		self.savePDFMenu.addAction(pdf2D)
+		self.savePDFMenu.addAction(pdf1D)
+		self.savePDFBtn.setMenu(self.savePDFMenu)
+		
+		self.editNotesBtn.clicked.connect(self.openNotepad)
+		
+		self.saveMATBtn.setToolTip('Save plot as .mat file')
+		self.savePDFBtn.setToolTip('Save plot and notes as PDF')
+		self.openDVBtn.setToolTip('View data vault parameters and comments')
+		self.editNotesBtn.setToolTip('Edit plot notes')
+		
+		self.saveLbl = QtGui.QLabel()
+		self.notesLbl = QtGui.QLabel()
+		self.saveLbl.setObjectName('saveLbl')
+		self.saveLbl.setText('Save Plot')
+		self.saveLbl.setStyleSheet("QLabel#saveLbl {background-color: 'black';color: rgb(131,131,131); font: 10pt; }")
+		self.notesLbl.setObjectName('notesLbl')
+		self.notesLbl.setText('Add Notes')
+		self.notesLbl.setStyleSheet("QLabel#notesLbl {background-color: 'black'; color: rgb(131,131,131); font: 10pt;}")
+		
+		self.backBtn.setObjectName("backBtn")
+		self.backBtn.setStyleSheet("QPushButton#backBtn {color:rgb(131,131,131);background-color:black;border: 2px solid rgb(131,131,131);border-radius: 5px; height: 40px; width: 70px}")
+		self.backBtn1.setObjectName("backBtn1")
+		self.backBtn1.setStyleSheet("QPushButton#backBtn1 {color:rgb(131,131,131);background-color:black;border: 2px solid rgb(131,131,131);border-radius: 5px; height: 38px; width: 70px}")
+		
+		self.saveMATBtn.setObjectName('saveMATBtn')
+		self.saveMATBtn.setStyleSheet("QPushButton#saveMATBtn {image:url(:/dvPlotter/Pictures/saveMATLAB.png);background-color: transparent; height: 23px; width: 23px;}")
+		self.savePDFBtn.setObjectName('savePDFBtn')
+		self.savePDFBtn.setStyleSheet("QPushButton#savePDFBtn {image:url(:/dvPlotter/Pictures/savePDF.png);background-color: transparent; height: 23px; width: 23px;}")
+		self.editNotesBtn.setObjectName('editNotesBtn')
+		self.editNotesBtn.setStyleSheet("QPushButton#editNotesBtn {image:url(:/dvPlotter/Pictures/editNotes.png);background-color: transparent; height: 15px; width: 23px;}")
+		self.openDVBtn.setObjectName('openDVBtn')
+		self.openDVBtn.setStyleSheet("QPushButton#openDVBtn {image:url(:/dvPlotter/Pictures/browse.png); background-color: transparent; height: 18px; width: 18px;}")
+		
+		
+
+		self.layout.setRowStretch(0, 500)
+		self.layout.setRowStretch(1,1)
+		self.layout.setRowStretch(2,1)
+		self.layout.setRowStretch(3,1)
+		self.layout.setRowStretch(4,1)
+		self.layout.setRowStretch(5,1)
+		self.layout.setRowStretch(6,1)
+		self.layout.setRowStretch(7,1)
+		self.layout.setRowStretch(8,1)
+		self.layout.setRowStretch(9,1)
+		self.layout.setRowStretch(10,1)
+		self.layout.setRowStretch(11,1)
+		self.layout.setRowStretch(12,1)
+		
+		self.layout.setColumnStretch(0, 18)
+		self.layout.setColumnStretch(1,8)
+		self.layout.setColumnStretch(2,2)
+		self.layout.setColumnStretch(3,2)
+		
+		self.layout.addWidget(self.mainPlot, *(0, 0, 1, 4))
+		self.layout.addWidget(self.plot1D, *(1,0, 12, 2))
+		self.layout.addWidget(self.xySelectLbl, *(2,2, 1, 2), alignment = QtCore.Qt.AlignTop)
+		self.layout.addWidget(self.xySelectBox, *(3,2, 1, 2), alignment = QtCore.Qt.AlignTop)
+		
+		self.layout.addWidget(self.tracePosLbl, *(4,2, 1, 2), alignment = QtCore.Qt.AlignTop)
+		self.layout.addWidget(self.tracePosBox, *(5,2, 1, 2), alignment = QtCore.Qt.AlignTop)
+		
+		self.layout.addWidget(self.saveLbl, *(7,2, 1, 2), alignment = QtCore.Qt.AlignHCenter| QtCore.Qt.AlignBottom)
+		self.layout.addWidget(self.backBtn, *(7,2, 2, 2), alignment = QtCore.Qt.AlignBottom)
+		self.layout.addWidget(self.saveMATBtn, *(8, 2, 1, 1), alignment = QtCore.Qt.AlignRight)
+		self.layout.addWidget(self.savePDFBtn, *(8, 3, 1, 1), alignment = QtCore.Qt.AlignLeft)
+		self.layout.addWidget(self.backBtn1, *(9,2, 2, 2), alignment = QtCore.Qt.AlignBottom)
+		self.layout.addWidget(self.notesLbl, *(9,2, 1, 2), alignment = QtCore.Qt.AlignHCenter| QtCore.Qt.AlignBottom)
+		self.layout.addWidget(self.editNotesBtn, *(10, 3, 1, 1), alignment = QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop) 
+		self.layout.addWidget(self.openDVBtn, *(10, 2, 1, 1), alignment = QtCore.Qt.AlignRight | QtCore.Qt.AlignTop)
+
+		self.setLayout(self.layout)
+		
+		self.backBtn.lower()
+		self.backBtn1.lower()
+		self.notesLbl.resize(100, 100)
+		#self.show()
+		
+		self.openFile(self.reactor)
+		
+	@inlineCallbacks
+	def openFile(self, c):
+		from labrad.wrappers import connectAsync
+
+		self.cxnS = yield connectAsync()
+		self.dv = yield self.cxnS.data_vault
+		yield self.dv.cd(self.dir)
+		yield self.dv.open(self.file)
+		print 'loading data'
+		self.loadData(self.reactor)
+	
+	def sleep(self,secs):
+		d = Deferred()
+		self.reactor.callLater(secs,d.callback,'Sleeping')
+		return d
+
+	@inlineCallbacks
+	def loadData(self, c):
+		getFlag = True
+		self.Data = np.array([])
+		while getFlag == True:
+			line = yield self.dv.get(1000L)
+
+			try:
+				if len(self.Data) != 0 and len(line) > 0:
+					self.Data = np.vstack((self.Data, line))						
+				elif len(self.Data) == 0 and len(line) > 0:
+					self.Data = np.asarray(line)
+				else:
+					getFlag = False
+			except:
+				getFlag = False
+		print 'got all data'
+
+		inds =[self.xIndex, self.yIndex, self.zIndex]
+		inx = np.delete(np.arange(0, len(self.Data[0])), inds)
+		self.Data = np.delete(self.Data, inx, axis = 1)
+		self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
+		self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+		self.z_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
+		#self.xData = self.Data[::, self.xIndex]
+		#self.yData = self.Data[::, self.yIndex]
+		dsX = np.diff(np.sort(self.Data[::, self.x_ind]))
+		dsY = np.diff(np.sort(self.Data[::, self.y_ind]))
+		xJumps = np.diff(np.argwhere(dsX > np.average(dsX) + np.std(dsX)).flatten())
+		yJumps = np.diff(np.argwhere(dsY > np.average(dsY) + np.std(dsY)).flatten())
+		yPts = spst.mode(xJumps)[0][0]
+		xPts = spst.mode(yJumps)[0][0]
+		self.extents = [np.amin(self.Data[::, self.x_ind]), np.amax(self.Data[::, self.x_ind]), np.amin(self.Data[::, self.y_ind]), np.amax(self.Data[::, self.y_ind])]
+		self.numPts = [int(xPts), int(yPts)]
+
+		print 'Extents: ', self.extents
+		print 'Points: ', self.numPts
+		self.x0, self.y0 = self.extents[0], self.extents[2]
+		self.xscale = float((self.extents[1] - self.extents[0])/self.numPts[0])
+		self.yscale = float((self.extents[3] - self.extents[2])/self.numPts[1])
+		
+		print 'binning data'
+
+		if self.extents[0] < self.extents[1]:
+			self.xBins = np.linspace(self.extents[0] - 0.5*self.xscale, self.extents[1] + 0.5*self.xscale, self.numPts[0] + 1)
+		else:
+			self.xBins = np.linspace(self.extents[0] + 0.5*self.xscale, self.extents[1] - 0.5*self.xscale, self.numPts[0] + 1)
+		if self.extents[2] < self.extents[3]:
+			self.yBins = np.linspace(self.extents[2] - 0.5*self.yscale, self.extents[3] + 0.5*self.yscale, self.numPts[1] + 1)
+		else:
+			self.yBins = np.linspace(self.extents[2] + 0.5*self.yscale, self.extents[3] - 0.5*self.yscale, self.numPts[1] + 1)
+		self.plotData = np.zeros([self.numPts[0], self.numPts[1]])
+		
+		self.Data[::, self.x_ind] = np.digitize(self.Data[::, self.x_ind], self.xBins)-1
+		self.Data[::, self.y_ind] = np.digitize(self.Data[::, self.y_ind], self.yBins)-1
+		
+		for cell in self.Data:
+			self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]
+		
+		self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[self.x0, self.y0],scale=[self.xscale, self.yscale])
+		
+		
+	
+	def updateXLineBox(self):
+		if self.xySelectBox.currentIndex() == 0:
+			pos = self.xLine.value()
+			self.tracePosBox.setValue(float(pos))
+			self.updatePlot1D(pos, 'x')
+	def updateYLineBox(self):
+		if self.xySelectBox.currentIndex() == 1:
+			pos = self.yLine.value()
+			self.tracePosBox.setValue(float(pos))
+			self.updatePlot1D(pos,'y')
+	
+	def toggleXYTrace(self, i):
+		if i == 0:
+			self.updateXLineBox()
+		elif i == 1:
+			self.updateYLineBox()
+		else:
+			print 'this is impossible!'
+			
+	def updatePlot1D(self, pos, axis):
+		#self.extents = [xMin, xMax, yMin, yMax]
+		if axis =='x':
+			if pos < self.extents[1] and pos > self.extents[0]:
+				index = int((pos - self.extents[0]) / self.xscale)
+				yVals = self.plotData[index, ::]
+				xVals = np.linspace(self.extents[2], self.extents[3], self.numPts[1])
+				self.lineXVals, self.lineYVals = xVals, yVals
+				self.plot1D.clear()
+				self.plot1D.plot(x = xVals, y = yVals, pen = 0.5)
+		elif axis == 'y':
+			if pos < self.extents[3] and pos > self.extents[2]:
+				index = int((pos - self.extents[2]) / self.yscale)
+				yVals = self.plotData[::, index]
+				xVals = np.linspace(self.extents[0], self.extents[1], self.numPts[0])
+				self.lineXVals, self.lineYVals = xVals, yVals
+				self.plot1D.clear()
+				self.plot1D.plot(x = xVals, y = yVals, pen = 0.5)
+		else:
+			print 'you have entered another dimension'
+			
+	def save1DMAT(self):
+		fold  = self.getSaveData('mat')
+		yData = np.asarray(self.lineYVals)
+		xData = np.asarray(self.lineXVals)
+		matData = np.transpose(np.vstack((xData, yData)))
+		savename = fold.split("/")[-1].split('.mat')[0]
+		sio.savemat(fold,{savename:matData})
+		matData = None
+		
+	def save2DMAT(self):
+		fold  = self.getSaveData('mat')
+		xVals = np.linspace(self.extents[0], self.extents[1], int(self.numPts[0]))
+		yVals = np.linspace(self.extents[2], self.extents[3], int(self.numPts[1]))
+		xInd, yInd = np.linspace(0,  self.numPts[0] - 1,  int(self.numPts[0])), np.linspace(0,  self.numPts[1] - 1, int(self.numPts[1]))
+		zX, zY, zXI, zYI = np.ones([1,int(self.numPts[1])]), np.ones([1,int(self.numPts[0])]), np.ones([1,int(self.numPts[1])]), np.ones([1,int(self.numPts[0])])
+		X, Y,  XI, YI = np.outer(xVals, zX), np.outer(zY, yVals), np.outer(xInd, zXI), np.outer(zYI, yInd)
+		XX, YY, XXI, YYI, ZZ = X.flatten(), Y.flatten(), XI.flatten(), YI.flatten(), self.plotData.flatten()
+		matData = np.transpose(np.vstack((XXI, YYI, XX, YY, ZZ)))
+		savename = fold.split("/")[-1].split('.mat')[0]
+		sio.savemat(fold,{savename:matData})
+		matData = None
+		
+	def savePDF(self, plot):
+		if plot == 2:
+			#creates a .png file of the 2D plot window
+			self.xLine.hide()
+			self.yLine.hide()
+			exporter = pg.exporters.ImageExporter(self.viewBig)
+			exporter.export('tmp.png')
+			self.xLine.show()
+			self.yLine.show()
+			header = self.plotTitle
+		elif plot == 1:
+			#creates a .png file of the 2D plot window
+			exporter = pg.exporters.ImageExporter(self.plot1D.plotItem)
+			exporter.export('tmp.png')
+			header = self.plotTitle + ' (' + str(self.xySelectBox.currentText()) + ' line cut at ' + str(self.tracePosBox.value()) + ')' 
+		#gets the file/folder for the PDF to be saved
+		fold = self.getSaveData('pdf')
+		try:
+			folder = '/'.join(fold.split("/")[0:-1]) + '/'
+			file = fold #fold.split("/")[-1]
+		except:
+			folder = os.getcwd()
+			file = str(self.plotTitle) + time.strftime("%Y-%m-%d_%H:%M") + '.pdf'
+		#generates the PDF
+		self.genPDF(folder, file, header)
+		
+	def getSaveData(self, ext):
+		if ext == 'pdf':
+			fold = str(QtGui.QFileDialog.getSaveFileName(self, directory = os.getcwd(), filter = "PDF Document (*.pdf)"))
+			if fold:
+				return fold
+		elif ext == 'mat':
+			fold = str(QtGui.QFileDialog.getSaveFileName(self, directory = os.getcwd(), filter = "MATLAB Data (*.mat)"))
+			if fold:
+				return fold
+
+	def render_template(self, template_file, **kwargs):
+		env = Environment(loader=PackageLoader("testPDFTemp", "templates"))
+		template = env.get_template(template_file)
+		return template.render(**kwargs)
+
+	def print_pdf(self, html, destination):
+		#application = QtGui.QApplication([sys.argv])
+		global app
+		web = QWebView()
+		web.setHtml(html)
+		application = app.instance()
+		application.processEvents()
+	 
+		printer = QPrinter()
+		printer.setPageSize(QPrinter.A4)
+		printer.setOutputFormat(QPrinter.PdfFormat)
+		printer.setOutputFileName(destination)
+		web.print_(printer)
+		
+
+	 
+	@inlineCallbacks
+	def genPDF(self, folder, file, header):
+		params = yield self.dv.get_parameters()
+		parList = []
+		for i in range(0, len(params)):
+				parList.append([str(params[i][0]), str(params[i][1])])
+		init_loc = os.getcwd()
+		os.chdir(folder)
+		print folder
+		try:
+			prgs = str(self.noteEdits.textEditor.toPlainText()).splitlines()
+		except:
+			prgs = []
+		dataSet = header
+		dateTime = time.strftime("%Y-%m-%d %H:%M")
+		
+		html = self.render_template(
+			"report.html",
+			data_set = dataSet,
+			date_time = dateTime,
+			parameters = parList,
+			paragraphs = prgs
+			
+		)
+		
+		self.print_pdf(html, str(file))
+		os.chdir(init_loc)
+		
+	def openNotepad(self):
+		self.noteEdits = noteEditor(self.notes)
+
+		self.noteEdits.exec_()
+		if self.noteEdits.accepted:
+			self.notes = self.noteEdits.textEditor.toPlainText()
+
+class noteEditor(QtGui.QDialog):
+	def __init__(self, notes):
+		super(noteEditor, self).__init__()
+		self.notes = notes
+		
+
+		self.textEditor = textEditor()
+		self.textEditor.setPlainText(self.notes)
+		
+		self.resize(400,400)
+		p = self.palette()
+		p.setColor(self.backgroundRole(), QtGui.QColor(0, 0, 0))
+		self.setPalette(p)
+		
+		self.okBtn = QtGui.QPushButton()
+		self.okBtn.setObjectName('okBtn')
+		self.okBtn.setText('OK')
+		self.okBtn.setStyleSheet("QPushButton#okBtn {color:rgb(131,131,131);background-color:black;border: 2px solid rgb(131,131,131);border-radius: 5px; width: 25px; font: 11pt}")
+		self.okBtn.clicked.connect(self.closeEdit)
+
+		self.layout = QtGui.QGridLayout(self)
+		self.layout.addWidget(self.textEditor, *(0, 0))
+		self.layout.addWidget(self.okBtn, *(1, 0), alignment = QtCore.Qt.AlignHCenter)
+		self.setLayout(self.layout)
+
+	def closeEdit(self):
+		self.accept()
+		self.hide()
+		
+	def closeEvent(self, e):
+		self.reject()
+		self.close()
+
+class LineNumberArea(QtGui.QWidget):
+
+	def __init__(self, editor):
+		super(QtGui.QWidget, self).__init__(editor)
+		self.myeditor = editor
+
+	def sizeHint(self):
+		return QtCore.QSize(self.myeditor.lineNumberAreaWidth(), 0)
+
+	def paintEvent(self, event):
+		self.myeditor.lineNumberAreaPaintEvent(event)
+
+class textEditor(QtGui.QPlainTextEdit):
+	def __init__(self, parent = None):
+		super(QtGui.QPlainTextEdit, self).__init__(parent)
+		
+		self.lineNumberArea = LineNumberArea(self)
+
+		self.connect(self, QtCore.SIGNAL('blockCountChanged(int)'), self.updateLineNumberAreaWidth)
+		self.connect(self, QtCore.SIGNAL('updateRequest(QRect,int)'), self.updateLineNumberArea)
+		self.connect(self, QtCore.SIGNAL('cursorPositionChanged()'), self.highlightCurrentLine)
+
+		self.updateLineNumberAreaWidth(0)
+
+	def lineNumberAreaWidth(self):
+		digits = 1
+		count = max(1, self.blockCount())
+		while count >= 10:
+			count /= 10
+			digits += 1
+		space = 3 + self.fontMetrics().width('9') * digits
+		return space
+
+
+	def updateLineNumberAreaWidth(self, _):
+		self.setViewportMargins(self.lineNumberAreaWidth(), 0, 0, 0)
+	def updateLineNumberArea(self, rect, dy):
+
+		if dy:
+			self.lineNumberArea.scroll(0, dy)
+		else:
+			self.lineNumberArea.update(0, rect.y(), self.lineNumberArea.width(),
+					   rect.height())
+
+		if rect.contains(self.viewport().rect()):
+			self.updateLineNumberAreaWidth(0)
+
+
+	def resizeEvent(self, event):
+		super(QtGui.QPlainTextEdit, self).resizeEvent(event)
+
+		cr = self.contentsRect();
+		self.lineNumberArea.setGeometry(QtCore.QRect(cr.left(), cr.top(),
+					self.lineNumberAreaWidth(), cr.height()))
+
+
+	def lineNumberAreaPaintEvent(self, event):
+		mypainter = QtGui.QPainter(self.lineNumberArea)
+
+		mypainter.fillRect(event.rect(), QtCore.Qt.lightGray)
+
+		block = self.firstVisibleBlock()
+		blockNumber = block.blockNumber()
+		top = self.blockBoundingGeometry(block).translated(self.contentOffset()).top()
+		bottom = top + self.blockBoundingRect(block).height()
+
+		# Just to make sure I use the right font
+		height = self.fontMetrics().height()
+		while block.isValid() and (top <= event.rect().bottom()):
+			if block.isVisible() and (bottom >= event.rect().top()):
+				number = str(blockNumber + 1)
+				mypainter.setPen(QtCore.Qt.black)
+				mypainter.drawText(0, top, self.lineNumberArea.width(), height,
+				 QtCore.Qt.AlignRight, number)
+
+			block = block.next()
+			top = bottom
+			bottom = top + self.blockBoundingRect(block).height()
+			blockNumber += 1
+
+	def highlightCurrentLine(self):
+		extraSelections = []
+
+		if not self.isReadOnly():
+			selection = QtGui.QTextEdit.ExtraSelection()
+
+			#TODO Edit color
+			lineColor = QtGui.QColor(QtCore.Qt.yellow).lighter(160)
+
+			selection.format.setBackground(lineColor)
+			selection.format.setProperty(QtGui.QTextFormat.FullWidthSelection, True)
+			selection.cursor = self.textCursor()
+			selection.cursor.clearSelection()
+			extraSelections.append(selection)
+		self.setExtraSelections(extraSelections)
+
+
+class plotSavedWin11111(QtGui.QDialog):
 	def __init__(self, reactor, file, dir, plotInfo, x0, y0, parent = None):
-		super(plotSavedWin, self).__init__(parent)
+		super(plotSavedWin11111, self).__init__(parent)
 
 
 		self.reactor = reactor
@@ -654,16 +1305,23 @@ class plotSavedWin(QtGui.QMainWindow):
 
 	def moveDefault(self):
 		self.move(self.pX, self.pY)
+
+	def setupPlot(self):
+		self.resize(700,550)
+		self.move(self.pX,self.pY)
+		p = self.palette()
+		p.setColor(self.backgroundRole(), QtGui.QColor(0, 0, 0))
+		self.setPalette(p)
+	
+		self.layout = QtGui.QGridLayout(self)
 		
-	def setupPlot(self):		
-		self.viewBig = pg.PlotItem(name = "Plot")
+		self.viewBig = pg.PlotItem(name = "Plot", title = self.plotInfo['title'])
 		self.viewBig.showAxis('top', show = True)
 		self.viewBig.showAxis('right', show = True)
-		self.viewBig.setLabel('left', self.plotInfo[1][1])
-		self.viewBig.setLabel('bottom', self.plotInfo[0][1])
+		self.viewBig.setLabel('left', self.plotInfo['y axis'])
+		self.viewBig.setLabel('bottom', self.plotInfo['x axis'])
 		self.viewBig.setAspectLocked(lock = False, ratio = 1)
-		self.mainPlot = pg.ImageView(parent = self.plot2DFrame, view = self.viewBig)
-		self.mainPlot.setGeometry(QtCore.QRect(0, 0, 700, 550))
+		self.mainPlot = pg.ImageView(view = self.viewBig)
 		self.mainPlot.ui.menuBtn.hide()
 		self.mainPlot.ui.histogram.item.gradient.loadPreset('bipolar')
 		self.mainPlot.ui.roiBtn.hide()
@@ -672,15 +1330,31 @@ class plotSavedWin(QtGui.QMainWindow):
 		self.viewBig.invertY(False)
 		self.viewBig.setXRange(-1, 1)
 		self.viewBig.setYRange(-1, 1)
+
+		self.layout.addWidget(self.mainPlot, *(0,0))
+		self.setLayout(self.layout)
 		
 		self.plotData = np.zeros([self.pxsize[0], self.pxsize[1]])
 		
 		self.xscale, self.yscale = np.absolute((self.extents[1] - self.extents[0])/self.pxsize[0]), np.absolute((self.extents[3] - self.extents[2])/self.pxsize[1])
-		self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[self.extents[0], self.extents[2]],scale=[self.xscale, self.yscale])
+		self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 		
+		if self.extents[0] < self.extents[1]:
+			self.xBins = np.linspace(self.extents[0] - 0.5 * self.xscale, self.extents[1] + 0.5 * self.xscale, self.pxsize[0]+1)
+		else:
+			self.xBins = np.linspace(self.extents[0] + 0.5 * self.xscale, self.extents[1] - 0.5 * self.xscale, self.pxsize[0]+1)
+		
+		if self.extents[2] < self.extents[3]:
+			self.yBins = np.linspace(self.extents[2] - 0.5 * self.yscale, self.extents[3] + 0.5 * self.yscale, self.pxsize[1]+1)
+		else:
+			self.yBins = np.linspace(self.extents[2] + 0.5 * self.yscale, self.extents[3] - 0.5 * self.yscale, self.pxsize[1]+1)
+	
 
-		self.xBins = np.linspace(self.extents[0] - 0.5 * self.xscale, self.extents[1] + 0.5 * self.xscale, self.pxsize[0]+1)
-		self.yBins = np.linspace(self.extents[2] - 0.5 * self.yscale, self.extents[3]+0.5 * self.yscale, self.pxsize[1]+1)
+			
+	def sleep(self,secs):
+		d = Deferred()
+		self.reactor.callLater(secs,d.callback,'Sleeping')
+		return d
 
 	@inlineCallbacks
 	def connect(self, c):
@@ -732,7 +1406,7 @@ class plotSavedWin(QtGui.QMainWindow):
 		
 	def closeEvent(self, e):
 		print 'closing window why?'
-'''
+
 
 class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 	def __init__(self, reactor, file, dir, cxn, dv, fresh, parent = None):
@@ -997,110 +1671,111 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 		for r in range(1, self.twoPlots.rowCount()):
 			self.plot2DInfo[r]['title'] = str(self.twoPlots.item(r, 0).text())
 			self.plot2DInfo[str(self.twoPlots.item(r, 0).text())] = self.plot2DInfo.pop(r)
-		try:
-			self.extents, self.pxsize = {},{}
-			
-			#As long as plots of some kind are being request
-			if self.plot2DInfo != {} or self.plot1DInfo != {}:
-				#First check if the extents are in datavault
-				#Note, this requires having added the extents and points
-				#parameters into the datavault file with format
-				#"axisname_rng" and "axisname_pnts"
-				#For example, for capacitance we have n0 and p0, these would be
-				#n0_rng and n_pnts, and p0_rng and p0_pnts
+		if self.fresh == 0 or self.fresh == 1:
+			try:
+				self.extents, self.pxsize = {},{}
 				
-				params = yield self.dv.get_parameters()
-				
-				if params != None:
-					params = dict((x,y) for x,y in params)
-					print params
+				#As long as plots of some kind are being request
+				if self.plot2DInfo != {} or self.plot1DInfo != {}:
+					#First check if the extents are in datavault
+					#Note, this requires having added the extents and points
+					#parameters into the datavault file with format
+					#"axisname_rng" and "axisname_pnts"
+					#For example, for capacitance we have n0 and p0, these would be
+					#n0_rng and n_pnts, and p0_rng and p0_pnts
 					
-					for plot2D in self.plot2DInfo:
-						x_axis = self.plot2DInfo[plot2D]['x axis']
-						y_axis = self.plot2DInfo[plot2D]['y axis']
-						
-						x_rng, x_pnts = x_axis + '_rng', x_axis + '_pnts'
-						y_rng, y_pnts = y_axis + '_rng', y_axis + '_pnts'
-						
-						if x_rng in params and x_pnts in params:
-							self.plot2DInfo[plot2D]['x range'] = params[x_rng]
-							self.plot2DInfo[plot2D]['x points'] = params[x_pnts]
-						if y_rng in params and y_pnts in params:
-							self.plot2DInfo[plot2D]['y range'] = params[y_rng]
-							self.plot2DInfo[plot2D]['y points'] = params[y_pnts]
-							
-					for plot1D in self.plot1DInfo:
-						x_axis = self.plot1DInfo[plot1D]['x axis']
-						x_rng, x_pnts = x_axis + '_rng', x_axis + '_pnts'
-						
-						if x_rng in params and x_pnts in params:
-							self.plot1DInfo[plot1D]['x range'] = params[x_rng]
-							self.plot1DInfo[plot1D]['x points'] = params[x_pnts]
+					params = yield self.dv.get_parameters()
 					
-					
-				#See which axes do not have any associated extents. 
-				#Prompt for those manually
-				
-				#First determine which axes extents are needed
-				needExtents = []
-				for plot2D in self.plot2DInfo:
-					if not 'x range' in self.plot2DInfo[plot2D]:
-						if not self.plot2DInfo[plot2D]['x axis'] in needExtents:
-							needExtents.append(self.plot2DInfo[plot2D]['x axis'])
-					if not 'y range' in self.plot2DInfo[plot2D]:
-						if not self.plot2DInfo[plot2D]['y axis'] in needExtents:
-							needExtents.append(self.plot2DInfo[plot2D]['y axis'])			   
-				
-				for plot1D in self.plot1DInfo:
-					if not 'x range' in self.plot1DInfo[plot1D]:
-						if not self.plot1DInfo[plot1D]['x axis'] in needExtents:
-							needExtents.append(self.plot1DInfo[plot1D]['x axis'])
-				
-				#print needExtents
-				if needExtents != []:
-					#If nonzero number needed, prompt for them manually
-					extPrompt = extentPrompt(self.reactor, needExtents, 450, 25, self)
-					extPrompt.exec_()
-
-				#print '2D Info: ', self.plot2DInfo
-				#print '1D Info: ', self.plot1DInfo
-				#print self.extents
-				#print self.pxsize
-
-				if needExtents == [] or extPrompt.accepted:
-					#print 'Moving on'
-					if needExtents != []:
+					if params != None:
+						params = dict((x,y) for x,y in params)
+						print params
+						
 						for plot2D in self.plot2DInfo:
-							for key in self.extents:
-								if key == self.plot2DInfo[plot2D]['x axis']:
-									self.plot2DInfo[plot2D]['x range'] = self.extents[key]
-									self.plot2DInfo[plot2D]['x points'] = self.pxsize[key]
-								if key == self.plot2DInfo[plot2D]['y axis']:
-									self.plot2DInfo[plot2D]['y range'] = self.extents[key]
-									self.plot2DInfo[plot2D]['y points'] = self.pxsize[key]
-									
+							x_axis = self.plot2DInfo[plot2D]['x axis']
+							y_axis = self.plot2DInfo[plot2D]['y axis']
+							
+							x_rng, x_pnts = x_axis + '_rng', x_axis + '_pnts'
+							y_rng, y_pnts = y_axis + '_rng', y_axis + '_pnts'
+							
+							if x_rng in params and x_pnts in params:
+								self.plot2DInfo[plot2D]['x range'] = params[x_rng]
+								self.plot2DInfo[plot2D]['x points'] = params[x_pnts]
+							if y_rng in params and y_pnts in params:
+								self.plot2DInfo[plot2D]['y range'] = params[y_rng]
+								self.plot2DInfo[plot2D]['y points'] = params[y_pnts]
+								
 						for plot1D in self.plot1DInfo:
-							for key in self.extents:
-								if key == self.plot1DInfo[plot1D]['x axis']:
-									self.plot1DInfo[plot1D]['x range'] = self.extents[key]
-									self.plot1DInfo[plot1D]['x points'] = self.pxsize[key]
-					
-					print '2D Info: ', self.plot2DInfo
-					print '1D Info: ', self.plot1DInfo
-					if self.fresh == 0 or self.fresh == 1:
-						yield self.mainWin.openLivePlots(copy.copy(self.plot2DInfo), copy.copy(self.plot1DInfo), copy.copy(self.fresh))
-						yield self.sleep(0.5)
-						self.close()
-					elif self.fresh == 2:
-						yield self.mainWin.openSavedPlots(copy.copy(self.file), copy.copy(self.dir), copy.copy(self.plot2DInfo))
-						yield self.sleep(0.5)
-						self.close()
+							x_axis = self.plot1DInfo[plot1D]['x axis']
+							x_rng, x_pnts = x_axis + '_rng', x_axis + '_pnts'
+							
+							if x_rng in params and x_pnts in params:
+								self.plot1DInfo[plot1D]['x range'] = params[x_rng]
+								self.plot1DInfo[plot1D]['x points'] = params[x_pnts]
 						
-		except Exception as inst:
-			print 'Following error was thrown: '
-			print inst
-			print 'Error thrown on line: '
-			print sys.exc_traceback.tb_lineno 
+						
+					#See which axes do not have any associated extents. 
+					#Prompt for those manually
+					
+					#First determine which axes extents are needed
+					needExtents = []
+					for plot2D in self.plot2DInfo:
+						if not 'x range' in self.plot2DInfo[plot2D]:
+							if not self.plot2DInfo[plot2D]['x axis'] in needExtents:
+								needExtents.append(self.plot2DInfo[plot2D]['x axis'])
+						if not 'y range' in self.plot2DInfo[plot2D]:
+							if not self.plot2DInfo[plot2D]['y axis'] in needExtents:
+								needExtents.append(self.plot2DInfo[plot2D]['y axis'])			   
+					
+					for plot1D in self.plot1DInfo:
+						if not 'x range' in self.plot1DInfo[plot1D]:
+							if not self.plot1DInfo[plot1D]['x axis'] in needExtents:
+								needExtents.append(self.plot1DInfo[plot1D]['x axis'])
+					
+					#print needExtents
+					if needExtents != []:
+						#If nonzero number needed, prompt for them manually
+						extPrompt = extentPrompt(self.reactor, needExtents, 450, 25, self)
+						extPrompt.exec_()
+
+					#print '2D Info: ', self.plot2DInfo
+					#print '1D Info: ', self.plot1DInfo
+					#print self.extents
+					#print self.pxsize
+
+					if needExtents == [] or extPrompt.accepted:
+						#print 'Moving on'
+						if needExtents != []:
+							for plot2D in self.plot2DInfo:
+								for key in self.extents:
+									if key == self.plot2DInfo[plot2D]['x axis']:
+										self.plot2DInfo[plot2D]['x range'] = self.extents[key]
+										self.plot2DInfo[plot2D]['x points'] = self.pxsize[key]
+									if key == self.plot2DInfo[plot2D]['y axis']:
+										self.plot2DInfo[plot2D]['y range'] = self.extents[key]
+										self.plot2DInfo[plot2D]['y points'] = self.pxsize[key]
+										
+							for plot1D in self.plot1DInfo:
+								for key in self.extents:
+									if key == self.plot1DInfo[plot1D]['x axis']:
+										self.plot1DInfo[plot1D]['x range'] = self.extents[key]
+										self.plot1DInfo[plot1D]['x points'] = self.pxsize[key]
+						
+						print '2D Info: ', self.plot2DInfo
+						print '1D Info: ', self.plot1DInfo
+						if self.fresh == 0 or self.fresh == 1:
+							yield self.mainWin.openLivePlots(copy.copy(self.plot2DInfo), copy.copy(self.plot1DInfo), copy.copy(self.fresh))
+							yield self.sleep(0.5)
+							self.close()
+			except Exception as inst:
+				print 'Following error was thrown: '
+				print inst
+				print 'Error thrown on line: '
+				print sys.exc_traceback.tb_lineno 
+		elif self.fresh == 2:
+			yield self.mainWin.openSavedPlots(copy.copy(self.file), copy.copy(self.dir), copy.copy(self.plot2DInfo))
+			yield self.sleep(0.5)
+			self.close()
+
 			
 	def sleep(self,secs):
 		d = Deferred()
@@ -1375,6 +2050,7 @@ class dataVaultExplorer(QtGui.QDialog, Ui_DataVaultExp):
 		self.close()
 
 if __name__ == "__main__":
+	global app
 	app = QtGui.QApplication([])
 	from qtreactor import pyqt4reactor
 	pyqt4reactor.install()
