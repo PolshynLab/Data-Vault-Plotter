@@ -153,7 +153,7 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 	def openSavedPlots(self, file, dir, twoPlots):
 		print 'opening plots'
 		x0, y0 = 450, 25
-		print twoPlots
+		#print twoPlots
 		for plot in twoPlots:
 			try:
 				self.thing = plotSavedWindow(self.reactor, file, dir, twoPlots[plot])
@@ -700,6 +700,7 @@ class plot1DWindow(QtGui.QDialog):
 			while i < self.traceCnt and i + 1 < self.numLines:
 				self.plot1D.plot(x = self.XplotData[(i)%4], y = self.YplotData[(i)%4], pen = pg.mkPen(color = self.colorWheel[int(self.id+i+1)%5]))
 				i += 1
+				print 'plotted multiples.....'
 		except Exception as inst:
 			print 'Following error was thrown: '
 			print inst
@@ -723,10 +724,16 @@ class plotSavedWindow(QtGui.QWidget):
 		self.file = file
 		self.dir = dir
 		self.plotInfo = plotInfo
+		print self.plotInfo
+		print '--------------------------------------------'
 		print 'got to this part'
 		self.xIndex = self.plotInfo['x index']
 		self.yIndex = self.plotInfo['y index']
 		self.zIndex = self.plotInfo['z index']
+		
+		self.xAxis = self.plotInfo['x axis']
+		self.yAxis = self.plotInfo['y axis']
+		self.zAxis = self.plotInfo['z axis']
 		'''
 		self.testData = np.random.normal(size = [1000, 1000])
 		self.modMat = np.arange(1000000)
@@ -958,14 +965,42 @@ class plotSavedWindow(QtGui.QWidget):
 		self.z_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
 		#self.xData = self.Data[::, self.xIndex]
 		#self.yData = self.Data[::, self.yIndex]
-		dsX = np.diff(np.sort(self.Data[::, self.x_ind]))
-		dsY = np.diff(np.sort(self.Data[::, self.y_ind]))
-		xJumps = np.diff(np.argwhere(dsX > np.average(dsX) + np.std(dsX)).flatten())
-		yJumps = np.diff(np.argwhere(dsY > np.average(dsY) + np.std(dsY)).flatten())
-		yPts = spst.mode(xJumps)[0][0]
-		xPts = spst.mode(yJumps)[0][0]
-		self.extents = [np.amin(self.Data[::, self.x_ind]), np.amax(self.Data[::, self.x_ind]), np.amin(self.Data[::, self.y_ind]), np.amax(self.Data[::, self.y_ind])]
-		self.numPts = [int(xPts), int(yPts)]
+
+		params = yield self.dv.get_parameters()
+					
+		if params != None:
+			params = dict((x,y) for x,y in params)		
+			x_rng, x_pnts = self.xAxis + '_rng', self.xAxis + '_pnts'
+			y_rng, y_pnts = self.yAxis + '_rng', self.yAxis + '_pnts'
+			
+			gotX, gotY = False, False
+			
+			if x_rng in params and x_pnts in params:
+				xMin, xMax = np.amin(params[x_rng]), np.amax(params[x_rng])
+				xPnts = params[x_pnts]
+				gotX = True
+				
+			if y_rng in params and y_pnts in params:
+				yMin, yMax = np.amin(params[y_rng]), np.amax(params[y_rng])
+				yPnts = params[y_pnts]
+				gotY = True
+			if gotX == True and gotY == True:
+				self.extents = [xMin, xMax, yMin, yMax]
+				self.numPts = [int(xPnts), int(yPnts)]
+				print 'got extents from params'
+			else:
+				pass
+	
+		else:
+			dsX = np.diff(np.sort(self.Data[::, self.x_ind]))
+			dsY = np.diff(np.sort(self.Data[::, self.y_ind]))
+			xJumps = np.diff(np.argwhere(dsX > np.average(dsX) + np.std(dsX)).flatten())
+			yJumps = np.diff(np.argwhere(dsY > np.average(dsY) + np.std(dsY)).flatten())
+			yPts = spst.mode(xJumps)[0][0]
+			xPts = spst.mode(yJumps)[0][0]
+			self.extents = [np.amin(self.Data[::, self.x_ind]), np.amax(self.Data[::, self.x_ind]), np.amin(self.Data[::, self.y_ind]), np.amax(self.Data[::, self.y_ind])]
+			self.numPts = [int(xPts), int(yPts)]
+			print 'got extents from magic'
 
 		print 'Extents: ', self.extents
 		print 'Points: ', self.numPts
@@ -978,18 +1013,25 @@ class plotSavedWindow(QtGui.QWidget):
 		if self.extents[0] < self.extents[1]:
 			self.xBins = np.linspace(self.extents[0] - 0.5*self.xscale, self.extents[1] + 0.5*self.xscale, self.numPts[0] + 1)
 		else:
-			self.xBins = np.linspace(self.extents[0] + 0.5*self.xscale, self.extents[1] - 0.5*self.xscale, self.numPts[0] + 1)
+			self.xBins = np.linspace(self.extents[1] - 0.5*self.xscale, self.extents[0] + 0.5*self.xscale, self.numPts[0] + 1)
 		if self.extents[2] < self.extents[3]:
 			self.yBins = np.linspace(self.extents[2] - 0.5*self.yscale, self.extents[3] + 0.5*self.yscale, self.numPts[1] + 1)
 		else:
-			self.yBins = np.linspace(self.extents[2] + 0.5*self.yscale, self.extents[3] - 0.5*self.yscale, self.numPts[1] + 1)
+			self.yBins = np.linspace(self.extents[3] - 0.5*self.yscale, self.extents[2] + 0.5*self.yscale, self.numPts[1] + 1)
 		self.plotData = np.zeros([self.numPts[0], self.numPts[1]])
 		
-		self.Data[::, self.x_ind] = np.digitize(self.Data[::, self.x_ind], self.xBins)-1
-		self.Data[::, self.y_ind] = np.digitize(self.Data[::, self.y_ind], self.yBins)-1
-		
-		for cell in self.Data:
-			self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]
+		print 'sorting the matrix'
+		try:
+			self.Data[::, self.x_ind] = np.digitize(self.Data[::, self.x_ind], self.xBins)-1
+			self.Data[::, self.y_ind] = np.digitize(self.Data[::, self.y_ind], self.yBins)-1
+			
+			for cell in self.Data:
+				self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]
+		except Exception as inst:
+			print 'Following error was thrown: '
+			print inst
+			print 'Error thrown on line: '
+			print sys.exc_traceback.tb_lineno 
 		
 		self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[self.x0, self.y0],scale=[self.xscale, self.yscale])
 		
@@ -1122,6 +1164,7 @@ class plotSavedWindow(QtGui.QWidget):
 				parList.append([str(params[i][0]), str(params[i][1])])
 		init_loc = os.getcwd()
 		os.chdir(folder)
+		temp_loc = "file://localhost/" + str(folder)
 		print folder
 		try:
 			prgs = str(self.noteEdits.textEditor.toPlainText()).splitlines()
@@ -1135,7 +1178,8 @@ class plotSavedWindow(QtGui.QWidget):
 			data_set = dataSet,
 			date_time = dateTime,
 			parameters = parList,
-			paragraphs = prgs
+			paragraphs = prgs,
+			tmp_loc = temp_loc
 			
 		)
 		
@@ -2025,9 +2069,9 @@ class dataVaultExplorer(QtGui.QDialog, Ui_DataVaultExp):
 	def selectFile(self):
 		if self.source == 'saved':
 			if self.selectedFile != '':
-				savedPlot = plotSetup(self.reactor,self.selectedFile, self.selectedDir, self.cxn, self.dv, 2, self.mainWin)
+				self.savedPlot = plotSetup(self.reactor,self.selectedFile, self.selectedDir, self.cxn, self.dv, 2, self.mainWin)
 				self.accept()
-				savedPlot.show()
+				self.savedPlot.show()
 			else:
 				pass
 		elif self.source == 'live':
