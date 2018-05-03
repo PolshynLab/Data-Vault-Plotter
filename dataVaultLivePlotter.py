@@ -724,16 +724,10 @@ class plotSavedWindow(QtGui.QWidget):
 		self.file = file
 		self.dir = dir
 		self.plotInfo = plotInfo
-		print self.plotInfo
-		print '--------------------------------------------'
-
+		print 'got to this part'
 		self.xIndex = self.plotInfo['x index']
 		self.yIndex = self.plotInfo['y index']
 		self.zIndex = self.plotInfo['z index']
-		
-		self.xAxis = self.plotInfo['x axis']
-		self.yAxis = self.plotInfo['y axis']
-		self.zAxis = self.plotInfo['z axis']
 		'''
 		self.testData = np.random.normal(size = [1000, 1000])
 		self.modMat = np.arange(1000000)
@@ -742,7 +736,6 @@ class plotSavedWindow(QtGui.QWidget):
 		'''
 		self.notes = ''
 		self.plotTitle = self.plotInfo['title']
-		self.pdfNum = 1
 		
 		self.resize(800,800)
 		self.move(450, 25)
@@ -966,42 +959,14 @@ class plotSavedWindow(QtGui.QWidget):
 		self.z_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
 		#self.xData = self.Data[::, self.xIndex]
 		#self.yData = self.Data[::, self.yIndex]
-
-		params = yield self.dv.get_parameters()
-					
-		if params != None:
-			params = dict((x,y) for x,y in params)		
-			x_rng, x_pnts = self.xAxis + '_rng', self.xAxis + '_pnts'
-			y_rng, y_pnts = self.yAxis + '_rng', self.yAxis + '_pnts'
-			
-			gotX, gotY = False, False
-			
-			if x_rng in params and x_pnts in params:
-				xMin, xMax = np.amin(params[x_rng]), np.amax(params[x_rng])
-				xPnts = params[x_pnts]
-				gotX = True
-				
-			if y_rng in params and y_pnts in params:
-				yMin, yMax = np.amin(params[y_rng]), np.amax(params[y_rng])
-				yPnts = params[y_pnts]
-				gotY = True
-			if gotX == True and gotY == True:
-				self.extents = [xMin, xMax, yMin, yMax]
-				self.numPts = [int(xPnts), int(yPnts)]
-				print 'got extents from params'
-			else:
-				pass
-	
-		else:
-			dsX = np.diff(np.sort(self.Data[::, self.x_ind]))
-			dsY = np.diff(np.sort(self.Data[::, self.y_ind]))
-			xJumps = np.diff(np.argwhere(dsX > np.average(dsX) + np.std(dsX)).flatten())
-			yJumps = np.diff(np.argwhere(dsY > np.average(dsY) + np.std(dsY)).flatten())
-			yPts = spst.mode(xJumps)[0][0]
-			xPts = spst.mode(yJumps)[0][0]
-			self.extents = [np.amin(self.Data[::, self.x_ind]), np.amax(self.Data[::, self.x_ind]), np.amin(self.Data[::, self.y_ind]), np.amax(self.Data[::, self.y_ind])]
-			self.numPts = [int(xPts), int(yPts)]
-			print 'got extents from magic'
+		dsX = np.diff(np.sort(self.Data[::, self.x_ind]))
+		dsY = np.diff(np.sort(self.Data[::, self.y_ind]))
+		xJumps = np.diff(np.argwhere(dsX > np.average(dsX) + np.std(dsX)).flatten())
+		yJumps = np.diff(np.argwhere(dsY > np.average(dsY) + np.std(dsY)).flatten())
+		yPts = spst.mode(xJumps)[0][0]
+		xPts = spst.mode(yJumps)[0][0]
+		self.extents = [np.amin(self.Data[::, self.x_ind]), np.amax(self.Data[::, self.x_ind]), np.amin(self.Data[::, self.y_ind]), np.amax(self.Data[::, self.y_ind])]
+		self.numPts = [int(xPts), int(yPts)]
 
 		print 'Extents: ', self.extents
 		print 'Points: ', self.numPts
@@ -1014,25 +979,18 @@ class plotSavedWindow(QtGui.QWidget):
 		if self.extents[0] < self.extents[1]:
 			self.xBins = np.linspace(self.extents[0] - 0.5*self.xscale, self.extents[1] + 0.5*self.xscale, self.numPts[0] + 1)
 		else:
-			self.xBins = np.linspace(self.extents[1] - 0.5*self.xscale, self.extents[0] + 0.5*self.xscale, self.numPts[0] + 1)
+			self.xBins = np.linspace(self.extents[0] + 0.5*self.xscale, self.extents[1] - 0.5*self.xscale, self.numPts[0] + 1)
 		if self.extents[2] < self.extents[3]:
 			self.yBins = np.linspace(self.extents[2] - 0.5*self.yscale, self.extents[3] + 0.5*self.yscale, self.numPts[1] + 1)
 		else:
-			self.yBins = np.linspace(self.extents[3] - 0.5*self.yscale, self.extents[2] + 0.5*self.yscale, self.numPts[1] + 1)
+			self.yBins = np.linspace(self.extents[2] + 0.5*self.yscale, self.extents[3] - 0.5*self.yscale, self.numPts[1] + 1)
 		self.plotData = np.zeros([self.numPts[0], self.numPts[1]])
 		
-		print 'sorting the matrix'
-		try:
-			self.Data[::, self.x_ind] = np.digitize(self.Data[::, self.x_ind], self.xBins)-1
-			self.Data[::, self.y_ind] = np.digitize(self.Data[::, self.y_ind], self.yBins)-1
-			
-			for cell in self.Data:
-				self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]
-		except Exception as inst:
-			print 'Following error was thrown: '
-			print inst
-			print 'Error thrown on line: '
-			print sys.exc_traceback.tb_lineno 
+		self.Data[::, self.x_ind] = np.digitize(self.Data[::, self.x_ind], self.xBins)-1
+		self.Data[::, self.y_ind] = np.digitize(self.Data[::, self.y_ind], self.yBins)-1
+		
+		for cell in self.Data:
+			self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]
 		
 		self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[self.x0, self.y0],scale=[self.xscale, self.yscale])
 		
@@ -1100,10 +1058,21 @@ class plotSavedWindow(QtGui.QWidget):
 		sio.savemat(fold,{savename:matData})
 		matData = None
 		
-	@inlineCallbacks
 	def savePDF(self, plot):
-		
-		self.pdfFile = r'tmp_'+str(self.pdfNum) +'.png'
+		if plot == 2:
+			#creates a .png file of the 2D plot window
+			self.xLine.hide()
+			self.yLine.hide()
+			exporter = pg.exporters.ImageExporter(self.viewBig)
+			exporter.export('tmp.png')
+			self.xLine.show()
+			self.yLine.show()
+			header = self.plotTitle
+		elif plot == 1:
+			#creates a .png file of the 2D plot window
+			exporter = pg.exporters.ImageExporter(self.plot1D.plotItem)
+			exporter.export('tmp.png')
+			header = self.plotTitle + ' (' + str(self.xySelectBox.currentText()) + ' line cut at ' + str(self.tracePosBox.value()) + ')' 
 		#gets the file/folder for the PDF to be saved
 		fold = self.getSaveData('pdf')
 		try:
@@ -1112,26 +1081,8 @@ class plotSavedWindow(QtGui.QWidget):
 		except:
 			folder = os.getcwd()
 			file = str(self.plotTitle) + time.strftime("%Y-%m-%d_%H:%M") + '.pdf'
-		init_loc = os.getcwd()
-		os.chdir(folder)
-		if plot == 2:
-			#creates a .png file of the 2D plot window
-			self.xLine.hide()
-			self.yLine.hide()
-			exporter = pg.exporters.ImageExporter(self.viewBig)
-			exporter.export(self.pdfFile)
-			self.xLine.show()
-			self.yLine.show()
-			header = self.plotTitle
-		elif plot == 1:
-			#creates a .png file of the 2D plot window
-			exporter = pg.exporters.ImageExporter(self.plot1D.plotItem)
-			exporter.export(self.pdfFile)
-			header = self.plotTitle + ' (' + str(self.xySelectBox.currentText()) + ' line cut at ' + str(self.tracePosBox.value()) + ')' 
-		os.chdir(init_loc)
-		yield self.sleep(0.5)
 		#generates the PDF
-		yield self.genPDF(folder, file, header)
+		self.genPDF(folder, file, header)
 		
 	def getSaveData(self, ext):
 		if ext == 'pdf':
@@ -1166,16 +1117,13 @@ class plotSavedWindow(QtGui.QWidget):
 	 
 	@inlineCallbacks
 	def genPDF(self, folder, file, header):
-		yield self.sleep(1)
-		temp_loc = None
 		params = yield self.dv.get_parameters()
 		parList = []
 		for i in range(0, len(params)):
 				parList.append([str(params[i][0]), str(params[i][1])])
 		init_loc = os.getcwd()
 		os.chdir(folder)
-		temp_loc = "file://localhost/" + str(folder) + self.pdfFile
-
+		print folder
 		try:
 			prgs = str(self.noteEdits.textEditor.toPlainText()).splitlines()
 		except:
@@ -1188,17 +1136,11 @@ class plotSavedWindow(QtGui.QWidget):
 			data_set = dataSet,
 			date_time = dateTime,
 			parameters = parList,
-			paragraphs = prgs,
-			tmp_loc = temp_loc
+			paragraphs = prgs
 			
 		)
 		
-		tmp_file = folder + self.pdfFile
 		self.print_pdf(html, str(file))
-		os.remove(tmp_file)
-
-		self.pdfNum += 1
-
 		os.chdir(init_loc)
 		
 	def openNotepad(self):
