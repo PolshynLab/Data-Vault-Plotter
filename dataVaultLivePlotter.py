@@ -726,7 +726,7 @@ class plotSavedWindow(QtGui.QWidget):
 		self.plotInfo = plotInfo
 		print self.plotInfo
 		print '--------------------------------------------'
-		print 'got to this part'
+
 		self.xIndex = self.plotInfo['x index']
 		self.yIndex = self.plotInfo['y index']
 		self.zIndex = self.plotInfo['z index']
@@ -742,6 +742,7 @@ class plotSavedWindow(QtGui.QWidget):
 		'''
 		self.notes = ''
 		self.plotTitle = self.plotInfo['title']
+		self.pdfNum = 1
 		
 		self.resize(800,800)
 		self.move(450, 25)
@@ -1099,21 +1100,10 @@ class plotSavedWindow(QtGui.QWidget):
 		sio.savemat(fold,{savename:matData})
 		matData = None
 		
+	@inlineCallbacks
 	def savePDF(self, plot):
-		if plot == 2:
-			#creates a .png file of the 2D plot window
-			self.xLine.hide()
-			self.yLine.hide()
-			exporter = pg.exporters.ImageExporter(self.viewBig)
-			exporter.export('tmp.png')
-			self.xLine.show()
-			self.yLine.show()
-			header = self.plotTitle
-		elif plot == 1:
-			#creates a .png file of the 2D plot window
-			exporter = pg.exporters.ImageExporter(self.plot1D.plotItem)
-			exporter.export('tmp.png')
-			header = self.plotTitle + ' (' + str(self.xySelectBox.currentText()) + ' line cut at ' + str(self.tracePosBox.value()) + ')' 
+		
+		self.pdfFile = r'tmp_'+str(self.pdfNum) +'.png'
 		#gets the file/folder for the PDF to be saved
 		fold = self.getSaveData('pdf')
 		try:
@@ -1122,8 +1112,26 @@ class plotSavedWindow(QtGui.QWidget):
 		except:
 			folder = os.getcwd()
 			file = str(self.plotTitle) + time.strftime("%Y-%m-%d_%H:%M") + '.pdf'
+		init_loc = os.getcwd()
+		os.chdir(folder)
+		if plot == 2:
+			#creates a .png file of the 2D plot window
+			self.xLine.hide()
+			self.yLine.hide()
+			exporter = pg.exporters.ImageExporter(self.viewBig)
+			exporter.export(self.pdfFile)
+			self.xLine.show()
+			self.yLine.show()
+			header = self.plotTitle
+		elif plot == 1:
+			#creates a .png file of the 2D plot window
+			exporter = pg.exporters.ImageExporter(self.plot1D.plotItem)
+			exporter.export(self.pdfFile)
+			header = self.plotTitle + ' (' + str(self.xySelectBox.currentText()) + ' line cut at ' + str(self.tracePosBox.value()) + ')' 
+		os.chdir(init_loc)
+		yield self.sleep(0.5)
 		#generates the PDF
-		self.genPDF(folder, file, header)
+		yield self.genPDF(folder, file, header)
 		
 	def getSaveData(self, ext):
 		if ext == 'pdf':
@@ -1158,14 +1166,16 @@ class plotSavedWindow(QtGui.QWidget):
 	 
 	@inlineCallbacks
 	def genPDF(self, folder, file, header):
+		yield self.sleep(1)
+		temp_loc = None
 		params = yield self.dv.get_parameters()
 		parList = []
 		for i in range(0, len(params)):
 				parList.append([str(params[i][0]), str(params[i][1])])
 		init_loc = os.getcwd()
 		os.chdir(folder)
-		temp_loc = "file://localhost/" + str(folder)
-		print folder
+		temp_loc = "file://localhost/" + str(folder) + self.pdfFile
+
 		try:
 			prgs = str(self.noteEdits.textEditor.toPlainText()).splitlines()
 		except:
@@ -1183,7 +1193,12 @@ class plotSavedWindow(QtGui.QWidget):
 			
 		)
 		
+		tmp_file = folder + self.pdfFile
 		self.print_pdf(html, str(file))
+		os.remove(tmp_file)
+
+		self.pdfNum += 1
+
 		os.chdir(init_loc)
 		
 	def openNotepad(self):
