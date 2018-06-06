@@ -18,3 +18,25 @@ The plotter has three main functions, all of which can be accessed from the soft
  - Line cuts can be plotted from any 2D plot
  - Both 2D plots and 1D line cuts can be saved as MATLAB files
  - Notes can be added to the plots in an integrated Notepad and the notes, along with either the full 2D plot or a line cut, can be saved as a PDF
+ 
+Adding Data Vault Parameters to Enable Plotting:
+For every independent variable add a range and a number of points using the following syntax replacing #### with your variable name
+
+dv.add_parameter('####_pnts', number of points)
+dv.add_parameter('####_rng', (minimum value, maximum value))
+
+For example, for the independent varialbe 'p0' which will take on 100 values between 0 and 5 you should add:
+ 
+dv.add_parameter('p0_pnts', 100)
+dv.add_parameter('p0_rng', (0,5))
+
+Adding Data Vault Parameter to Auto-start Plotting
+To auto-start plots when your Data Vault file is created, add a parameter 'live_plots' followed by a list of tuples where each tuple is a list of variable names you want to plot on each axis. For a 2D plot, add (x_axis, y_axis, z_axis). For a 1D trace add (x_axis, y_axis). 
+
+For example, the following line will autostart a 2D plot of 'C_v' vs. 'n0' and 'p0', a 2D plot of 'V' vs. 'p0' and 'n0', and a 1D plot of 'T' vs. 'p0':
+
+dv.add_parameter('live_plots', (('n0', 'p0', 'C_v'), ('p0', 'T'), ('p0', 'n0', 'V')))
+
+If you want to only auto-start 1 plot, do NOT place the tuple inside a list. For instance if you ONLY want to plot 'C_v' vs. 'n0' and 'p0' add the parameter
+
+dv.add_parameter('live_plots', ('n0', 'p0', 'C_v'))
