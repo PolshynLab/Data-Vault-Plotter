@@ -19,7 +19,8 @@ The plotter has three main functions, all of which can be accessed from the soft
  - Both 2D plots and 1D line cuts can be saved as MATLAB files
  - Notes can be added to the plots in an integrated Notepad and the notes, along with either the full 2D plot or a line cut, can be saved as a PDF
  
-Adding Data Vault Parameters to Enable Plotting:
+##Adding Data Vault Parameters to Enable Plotting:
+
 For every independent variable add a range and a number of points using the following syntax replacing #### with your variable name
 
 dv.add_parameter('####_pnts', number of points)
