@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>890</width>
-    <height>409</height>
+    <height>368</height>
    </rect>
   </property>
   <property name="contextMenuPolicy">
@@ -203,7 +203,7 @@ selection-color: black;
    <property name="geometry">
     <rect>
      <x>340</x>
-     <y>360</y>
+     <y>330</y>
      <width>75</width>
      <height>23</height>
     </rect>
@@ -227,24 +227,24 @@ border-radius: 5px
     <string>OK</string>
    </property>
   </widget>
-  <widget class="QPushButton" name="cancel">
+  <widget class="QPushButton" name="cancelBtn">
    <property name="geometry">
     <rect>
      <x>470</x>
-     <y>360</y>
+     <y>330</y>
      <width>75</width>
      <height>23</height>
     </rect>
    </property>
    <property name="styleSheet">
-    <string notr="true">QPushButton:pressed#cancel{
+    <string notr="true">QPushButton:pressed#cancelBtn{
 color:black;
 background-color:rgb(131,131,131);
 border: 2px solid rgb(131,131,131);
 border-radius: 5px
 }
 
-QPushButton#cancel{
+QPushButton#cancelBtn{
 color:rgb(131,131,131);
 background-color:black;
 border: 2px solid rgb(131,131,131);
@@ -385,6 +385,73 @@ border-radius: 5px
    </property>
    <property name="text">
     <string/>
+   </property>
+  </widget>
+  <widget class="QCheckBox" name="plt2DSetBox">
+   <property name="geometry">
+    <rect>
+     <x>30</x>
+     <y>291</y>
+     <width>13</width>
+     <height>13</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string/>
+   </property>
+   <property name="iconSize">
+    <size>
+     <width>50</width>
+     <height>50</height>
+    </size>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+  </widget>
+  <widget class="QCheckBox" name="plt1DSetBox">
+   <property name="geometry">
+    <rect>
+     <x>460</x>
+     <y>291</y>
+     <width>13</width>
+     <height>13</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string/>
+   </property>
+   <property name="iconSize">
+    <size>
+     <width>50</width>
+     <height>50</height>
+    </size>
+   </property>
+  </widget>
+  <widget class="QLabel" name="plt2DSetLbl">
+   <property name="geometry">
+    <rect>
+     <x>50</x>
+     <y>290</y>
+     <width>93</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:10pt; color:#838383;&quot;&gt;Plot 2D Data Set&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="plt1DSetLbl">
+   <property name="geometry">
+    <rect>
+     <x>480</x>
+     <y>290</y>
+     <width>93</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;span style=&quot; font-size:10pt; color:#838383;&quot;&gt;Plot 1D Data Set&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </widget>
  </widget>
