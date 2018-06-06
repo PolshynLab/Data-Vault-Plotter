@@ -26,7 +26,7 @@ For every independent variable add a range and a number of points using the foll
 dv.add_parameter('####_pnts', number of points)
 dv.add_parameter('####_rng', (minimum value, maximum value))
 
-For example, for the independent varialbe 'p0' which will take on 100 values between 0 and 5 you should add:
+where dv is your LabRAD Data Vault connection. For example, for the independent varialbe 'p0' which will take on 100 values between 0 and 5 you should add:
  
 dv.add_parameter('p0_pnts', 100)
 dv.add_parameter('p0_rng', (0,5))
