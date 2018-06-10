@@ -38,6 +38,6 @@ For example, the following line will autostart a 2D plot of 'C_v' vs. 'n0' and '
 
 dv.add_parameter('live_plots', (('n0', 'p0', 'C_v'), ('p0', 'T'), ('p0', 'n0', 'V')))
 
-If you want to only auto-start 1 plot, do NOT place the tuple inside a list. For instance if you ONLY want to plot 'C_v' vs. 'n0' and 'p0' add the parameter
+If you want to only auto-start 1 plot, place the tuple inside a list with brackets []. For instance if you ONLY want to plot 'C_v' vs. 'n0' and 'p0' add the parameter
 
-dv.add_parameter('live_plots', ('n0', 'p0', 'C_v'))
+dv.add_parameter('live_plots', [('n0', 'p0', 'C_v')])
