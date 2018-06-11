@@ -129,29 +129,20 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 			params = dict((x,y) for x,y in params)	
 			parKeys = params.keys()
 			if 'live_plots' in parKeys:
-				print 'init live plots'
 				self.initLivePlotting(params, vars)
 			else:
 				pass
 		else:
 			pass
-			'''
-			self.setupListenPlot = plotSetup(self.reactor, signal, self.listenTo, self.cxn, self.dv, 0, self)
-			self.setupListenPlot.show()
-			'''
 			
 	@inlineCallbacks
 	def initLivePlotting(self, params, vars, c = None):
-		print 'Live Plots: ', params['live_plots']
 		plot1DDict, plot2DDict = {}, {}
 		missingInfo = False
 		toPlot = params['live_plots']
-		print 'To Plot: ', toPlot
 		indVars, depVars = [x[0] for x in vars[0]], [x[0] for x in vars[1]]
-		print 'Varialbes: ', vars
 		for plot in toPlot:
 			if len(plot) == 2:
-				print plot
 				try:
 					title = str(plot[1]) + ' vs. ' + str(plot[0])
 					x_axis, y_axis = str(plot[0]), str(plot[1])
@@ -171,25 +162,17 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 					y_rng = params[y_axis + '_rng']
 					y_pnts = params[y_axis + '_pnts']
 					plot2DDict[title] = {'title' : title, 'x axis' : x_axis, 'y axis' : y_axis, 'z axis' : z_axis, 'x index' : x_index, 'y index' : y_index, 'z index' : z_index , 'x range' : x_rng, 'x points' : x_pnts, 'y range' : y_rng, 'y points' : y_pnts}
-					print title
 				except:
 					missingInfo = True
 			else:
 				pass
-		print '1D Plots: ', plot1DDict
-		print '2D Plots: ', plot2DDict
 		if missingInfo == False:
-			print 'Starting Auto-Plots...'
 			yield self.openLivePlots(plot2DDict, plot1DDict, 0, self.reactor)
 			yield self.sleep(0.5)
 
 		else:
 			pass
-			'''
-			print '-------------------- Auto-start plots format is incorrect --------------------'
-			self.setupListenPlot = plotSetup(self.reactor, self.listenPlotFile, self.listenTo, self.cxn, self.dv, 0, self)
-			self.setupListenPlot.show()
-			'''
+
 	
 	def update_params(self):
 		pass
@@ -239,7 +222,6 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		elif dim == 1:
 			for plot in allPlots:
 				try:
-					print 'opening 1D plot', plot
 					thing = plotSaved1DWindow(self.reactor, file, dir, allPlots[plot], y0, color0)
 					thing.show()
 					self.savePlotList.append(thing)
@@ -253,7 +235,6 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 
 	def plotLiveData(self):
 		self.dvExplorer = dataVaultExplorer(self.reactor, 'live', self.listenTo, self)
-		print 'opening liver'
 		self.dvExplorer.show()
 		
 	def setupListener(self):
@@ -263,9 +244,6 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		drcExplorer.show()
 		
 	def plotSavedDataFunc(self):
-		print 'hi there'
-		#self.pltSaved = plotSavedWindow()
-		#self.pltSaved.show()
 		self.dvExplorer = dataVaultExplorer(self.reactor, 'saved', self.listenTo, self)
 		self.dvExplorer.show()
 		
@@ -386,7 +364,6 @@ class extentPrompt(QtGui.QDialog, Ui_ExtPrompt):
 			self.mainWin.pxsize = pxsize
 			self.accept()
 		else:
-			print errCell
 			for ii in range(0, len(errCell)):
 				self.extTable.item(errCell[ii][0], errCell[ii][1]).setBackgroundColor(QtGui.QColor(250,190,160))
 				
@@ -408,13 +385,6 @@ class plot2DWindow(QtGui.QDialog):
 			self.xIndex = self.plotInfo['x index']
 			self.yIndex = self.plotInfo['y index']
 			self.zIndex = self.plotInfo['z index']
-			
-			print '------------------------------'
-			print 'Plot parameters: '
-			print file
-			print plotInfo
-			print fresh
-			print dir
 
 			self.pX, self.pY = x0, y0
 			self.extents = [self.plotInfo['x range'][0], self.plotInfo['x range'][1], self.plotInfo['y range'][0], self.plotInfo['y range'][1]]
@@ -449,8 +419,7 @@ class plot2DWindow(QtGui.QDialog):
 
 			yield self.addListen(self.reactor)
 			newData = yield self.dv.get()
-			print 'New Data: ', newData[0]
-			print 'Length: ', len(newData)
+
 
 			if len(newData[0]) != 0:
 				inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex])
@@ -459,7 +428,6 @@ class plot2DWindow(QtGui.QDialog):
 				y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.yIndex)[0][0]
 				z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.zIndex)[0][0]
 				newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
-				print newData[::, x_ind]
 				newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
 
@@ -479,13 +447,9 @@ class plot2DWindow(QtGui.QDialog):
 	def addListen(self, c):
 		yield self.dv.signal__data_available(self.id)
 		yield self.dv.addListener(listener=self.updatePlot, ID=self.id)
-		print '2D listener added with ID: ' + str(self.id)
-
-
 		
 	def setupPlot(self):
 		global ID_NEWDATA
-		print 'setting up plot............', ID_NEWDATA
 		self.id = ID_NEWDATA
 		ID_NEWDATA = ID_NEWDATA + 1
 		try: 
@@ -613,7 +577,6 @@ class plot1DWindow(QtGui.QDialog):
 		
 	def setupPlot(self):
 		global ID_NEWDATA
-		print 'setting up plot............', ID_NEWDATA
 		self.id = ID_NEWDATA
 		ID_NEWDATA = ID_NEWDATA + 1
 		
@@ -693,7 +656,6 @@ class plot1DWindow(QtGui.QDialog):
 		self.styleColorTxt = 'color: rgb'+self.currentTraceColor+';}'
 		self.traceCntBox.setStyleSheet(self.traceCntStyle+self.styleColorTxt)
 		self.traceCnt = int(i)
-		print 'Trace Count: ', self.traceCnt
 	
 	@inlineCallbacks
 	def setupListener(self, c):
@@ -744,7 +706,6 @@ class plot1DWindow(QtGui.QDialog):
 	def addListen(self, c):
 		yield self.dv.signal__data_available(self.id)
 		yield self.dv.addListener(listener=self.updatePlot, ID=self.id)
-		print '1D listener added with ID: ' + str(self.id)
 
 	@inlineCallbacks
 	def updatePlot(self, c, signal):
@@ -819,9 +780,6 @@ class plotSaved1DWindow(QtGui.QWidget):
 		self.dir = dir
 		self.plotInfo = plotInfo
 		
-		print self.plotInfo
-		print '--------------------------------------------'
-
 		self.xIndex = self.plotInfo['x index']
 		self.yIndex = self.plotInfo['y index']
 		
@@ -935,7 +893,6 @@ class plotSaved1DWindow(QtGui.QWidget):
 		self.dv = yield self.cxnS.data_vault
 		yield self.dv.cd(self.dir)
 		yield self.dv.open(self.file)
-		print 'loading data'
 		self.loadData(self.reactor)
 	
 	def sleep(self,secs):
@@ -959,7 +916,6 @@ class plotSaved1DWindow(QtGui.QWidget):
 					getFlag = False
 			except:
 				getFlag = False
-		print 'got all data'
 
 		inds =[self.xIndex, self.yIndex]
 		inx = np.delete(np.arange(0, len(self.Data[0])), inds)
@@ -1002,22 +958,18 @@ class plotSaved1DWindow(QtGui.QWidget):
 			folder = os.getcwd()
 			file = str(self.plotTitle) + time.strftime("%Y-%m-%d_%H:%M") + '.pdf'
 		self.pdfFile = folder + '//tmp' + str(time.time()) + '.png'
-		print 'PDF File: ', self.pdfFile
 		init_loc = os.getcwd()
 		os.chdir(folder)
 		if os.path.isfile(file):
 			os.remove(file)
 		if os.path.isfile(self.pdfFile):
 			os.remove(self.pdfFile)
-		print 'sleeping'
 		yield self.sleep(.5)
 		self.pdfNum += 1
-		print 'going to export'
 		yield self.exportPng(init_loc, folder, file)
 		
 	@inlineCallbacks
 	def exportPng(self, init_loc, folder, file, c = None):
-		print 'sting export'
 		exporter = pg.exporters.ImageExporter(self.plot1D.plotItem)
 		exporter.export(self.pdfFile)
 		header = self.plotTitle
@@ -1101,8 +1053,6 @@ class plotSaved2DWindow(QtGui.QWidget):
 		self.file = file
 		self.dir = dir
 		self.plotInfo = plotInfo
-		print self.plotInfo
-		print '--------------------------------------------'
 
 		self.xIndex = self.plotInfo['x index']
 		self.yIndex = self.plotInfo['y index']
@@ -1303,12 +1253,10 @@ class plotSaved2DWindow(QtGui.QWidget):
 	@inlineCallbacks
 	def openFile(self, c):
 		from labrad.wrappers import connectAsync
-
 		self.cxnS = yield connectAsync()
 		self.dv = yield self.cxnS.data_vault
 		yield self.dv.cd(self.dir)
 		yield self.dv.open(self.file)
-		print 'loading data'
 		self.loadData(self.reactor)
 	
 	def sleep(self,secs):
@@ -1332,7 +1280,6 @@ class plotSaved2DWindow(QtGui.QWidget):
 					getFlag = False
 			except:
 				getFlag = False
-		print 'got all data'
 
 		inds =[self.xIndex, self.yIndex, self.zIndex]
 		inx = np.delete(np.arange(0, len(self.Data[0])), inds)
@@ -1340,8 +1287,6 @@ class plotSaved2DWindow(QtGui.QWidget):
 		self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
 		self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
 		self.z_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
-		#self.xData = self.Data[::, self.xIndex]
-		#self.yData = self.Data[::, self.yIndex]
 
 		params = yield self.dv.get_parameters()
 					
@@ -1364,7 +1309,6 @@ class plotSaved2DWindow(QtGui.QWidget):
 			if gotX == True and gotY == True:
 				self.extents = [xMin, xMax, yMin, yMax]
 				self.numPts = [int(xPnts), int(yPnts)]
-				print 'got extents from params'
 			else:
 				pass
 	
@@ -1377,15 +1321,11 @@ class plotSaved2DWindow(QtGui.QWidget):
 			xPts = spst.mode(yJumps)[0][0]
 			self.extents = [np.amin(self.Data[::, self.x_ind]), np.amax(self.Data[::, self.x_ind]), np.amin(self.Data[::, self.y_ind]), np.amax(self.Data[::, self.y_ind])]
 			self.numPts = [int(xPts), int(yPts)]
-			print 'got extents from magic'
 
-		print 'Extents: ', self.extents
-		print 'Points: ', self.numPts
 		self.x0, self.y0 = self.extents[0], self.extents[2]
 		self.xscale = float((self.extents[1] - self.extents[0])/self.numPts[0])
 		self.yscale = float((self.extents[3] - self.extents[2])/self.numPts[1])
-		
-		print 'binning data'
+
 
 		if self.extents[0] < self.extents[1]:
 			self.xBins = np.linspace(self.extents[0] - 0.5*self.xscale, self.extents[1] + 0.5*self.xscale, self.numPts[0] + 1)
@@ -1396,8 +1336,7 @@ class plotSaved2DWindow(QtGui.QWidget):
 		else:
 			self.yBins = np.linspace(self.extents[3] - 0.5*self.yscale, self.extents[2] + 0.5*self.yscale, self.numPts[1] + 1)
 		self.plotData = np.zeros([self.numPts[0], self.numPts[1]])
-		
-		print 'sorting the matrix'
+
 		try:
 			self.Data[::, self.x_ind] = np.digitize(self.Data[::, self.x_ind], self.xBins)-1
 			self.Data[::, self.y_ind] = np.digitize(self.Data[::, self.y_ind], self.yBins)-1
@@ -1517,11 +1456,8 @@ class plotSaved2DWindow(QtGui.QWidget):
 		
 	@inlineCallbacks
 	def exportPng(self, init_loc, folder, file, plot, c = None):
-		print 'stiartng export'
-		print plot
 		if plot == 2:
 			#creates a .png file of the 2D plot window
-			print 'exportin 2d'
 			self.xLine.hide()
 			self.yLine.hide()
 			exporter = pg.exporters.ImageExporter(self.viewBig)
@@ -1581,18 +1517,21 @@ class plotSaved2DWindow(QtGui.QWidget):
 			prgs = []
 		dataSet = header
 		dateTime = time.strftime("%Y-%m-%d %H:%M")
-		
-		html = self.render_template(
-			"report.html",
-			data_set = dataSet,
-			date_time = dateTime,
-			parameters = parList,
-			paragraphs = prgs,
-			tmp_loc = temp_loc
-			
-		)
-
-
+		try:
+			html = self.render_template(
+				"report.html",
+				data_set = dataSet,
+				date_time = dateTime,
+				parameters = parList,
+				paragraphs = prgs,
+				tmp_loc = temp_loc
+				
+			)
+		except Exception as inst:
+			print 'Following error was thrown: '
+			print inst
+			print 'Error thrown on line: '
+			print sys.exc_traceback.tb_lineno 
 
 		self.pdfNum += 1
 		self.print_pdf(html, str(file))
@@ -2126,8 +2065,8 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 				print 'Error thrown on line: '
 				print sys.exc_traceback.tb_lineno 
 		elif self.fresh == 2:
-			print self.plot2DInfo 
-			print self.plot1DInfo 
+			print '2D Info: ', self.plot2DInfo
+			print '1D Info: ', self.plot1DInfo
 			if self.plot2DInfo == {} and self.plot1DInfo == {}:
 				pass
 			elif self.plot1DInfo == {}:
@@ -2150,7 +2089,6 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 		self.close()
 
 	def closeEvent(self, e):
-		print 'closing the window'
 		self.close()
 
 class dirExplorer(QtGui.QDialog, Ui_DirExp):
@@ -2400,7 +2338,6 @@ class dataVaultExplorer(QtGui.QDialog, Ui_DataVaultExp):
 			if self.selectedFile != '':
 				self.mainWin.listenPlotFile = str(self.selectedFile)
 				self.mainWin.listenTo = self.selectedDir
-				print 'Doing this'
 				self.livePlot = plotSetup(self.reactor,self.selectedFile, self.selectedDir, self.cxn, self.dv, 1, self.mainWin)
 				self.accept()
 				self.livePlot.show()
