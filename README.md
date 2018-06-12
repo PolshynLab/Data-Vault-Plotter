@@ -22,22 +22,23 @@ The plotter has three main functions, all of which can be accessed from the soft
 # Adding Data Vault Parameters to Enable Plotting:
 
 For every independent variable add a range and a number of points using the following syntax replacing #### with your variable name
-
+```python
 dv.add_parameter('####_pnts', number of points)
 dv.add_parameter('####_rng', (minimum value, maximum value))
-
+```
 where dv is your LabRAD Data Vault connection. For example, for the independent varialbe 'p0' which will take on 100 values between 0 and 5 you should add:
- 
+ ```python
 dv.add_parameter('p0_pnts', 100)
 dv.add_parameter('p0_rng', (0,5))
-
+```
 Adding Data Vault Parameter to Auto-start Plotting
 To auto-start plots when your Data Vault file is created, add a parameter 'live_plots' followed by a list of tuples where each tuple is a list of variable names you want to plot on each axis. For a 2D plot, add (x_axis, y_axis, z_axis). For a 1D trace add (x_axis, y_axis). 
 
 For example, the following line will autostart a 2D plot of 'C_v' vs. 'n0' and 'p0', a 2D plot of 'V' vs. 'p0' and 'n0', and a 1D plot of 'T' vs. 'p0':
-
+```python
 dv.add_parameter('live_plots', (('n0', 'p0', 'C_v'), ('p0', 'T'), ('p0', 'n0', 'V')))
-
+```
 If you want to only auto-start 1 plot, place the tuple inside a list with brackets []. For instance if you ONLY want to plot 'C_v' vs. 'n0' and 'p0' add the parameter
-
+```python
 dv.add_parameter('live_plots', [('n0', 'p0', 'C_v')])
+```
