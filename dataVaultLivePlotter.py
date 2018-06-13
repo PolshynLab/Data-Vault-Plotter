@@ -29,6 +29,7 @@ dvExplorerGUI = path + r"\dvExplorer.ui"
 dirExplorerGUI = path + r"\dirExplorer.ui"
 editInfoGUI = path + r"\editDatasetInfo.ui"
 plotSetupUI = path + r"\plotSetup.ui"
+helpWindowUI = path + r"\helpWindow.ui"
 
 Ui_MainWin, QtBaseClass = uic.loadUiType(mainWinGUI)
 Ui_ExtPrompt, QtBaseClass = uic.loadUiType(plotExtentGUI)
@@ -36,9 +37,11 @@ Ui_DataVaultExp, QtBaseClass = uic.loadUiType(dvExplorerGUI)
 Ui_DirExp, QtBaseClass = uic.loadUiType(dirExplorerGUI)
 Ui_EditDataInfo, QtBaseClass = uic.loadUiType(editInfoGUI)
 Ui_PlotSetup, QtBaseClass = uic.loadUiType(plotSetupUI)
+Ui_HelpWindow, QtBaseClass = uic.loadUiType(helpWindowUI)
 
 ID_NEWDATA = 999
 
+	
 class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 	def __init__(self, reactor, parent = None):
 		super(dvPlotter, self).__init__(parent)
@@ -55,6 +58,8 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		self.closeWin.clicked.connect(self.closePlotter)
 		self.plotLive.clicked.connect(self.plotLiveData)
 		
+		self.helpBtn.clicked.connect(self.openHelpWindow)
+		
 		self.changeDir.setEnabled(False)
 		self.plotLive.setEnabled(False)
 		
@@ -70,6 +75,11 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		
 	def moveDefault(self):
 		self.move(25,25)
+		
+	def openHelpWindow(self):
+		self.helpWindowDlg = helpTextWindow(self)
+		self.helpWindowDlg.show()
+		self.helpBtn.setEnabled(False)
 		
 	@inlineCallbacks
 	def initReact(self, c):
@@ -385,6 +395,9 @@ class plot2DWindow(QtGui.QDialog):
 			self.xIndex = self.plotInfo['x index']
 			self.yIndex = self.plotInfo['y index']
 			self.zIndex = self.plotInfo['z index']
+			
+			self.connect(QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL+ QtCore.Qt.Key_D), self), QtCore.SIGNAL('activated()'),self.copyPlotToClip)
+
 
 			self.pX, self.pY = x0, y0
 			self.extents = [self.plotInfo['x range'][0], self.plotInfo['x range'][1], self.plotInfo['y range'][0], self.plotInfo['y range'][1]]
@@ -406,6 +419,33 @@ class plot2DWindow(QtGui.QDialog):
 			print inst
 			print 'Error thrown on line: '
 			print sys.exc_traceback.tb_lineno 
+			
+	def copyPlotToClip(self):
+		r = self.mainPlot.ui.histogram.region.getRegion()
+		self.mainPlot.ui.histogram.vb.setYRange(*r)
+		#create ImageExpoerters:
+		mainExp = pg.exporters.ImageExporter(self.viewBig)
+		colorAxisExp = pg.exporters.ImageExporter(self.mainPlot.ui.histogram.axis)
+		colorBarExp = pg.exporters.ImageExporter(self.mainPlot.ui.histogram.gradient)
+		#create QImages:
+		main =mainExp.export(toBytes=True)
+		colorAxis =colorAxisExp.export(toBytes=True)
+		colorBar = colorBarExp.export(toBytes=True)
+		#define teh size:
+		x = main.width() + colorAxis.width() + colorBar.width()
+		y = main.height()
+		#to get everything in the same height:
+		yOffs = [0,0.5*(y-colorAxis.height()),0.5*(y-colorBar.height())]
+		result = QtGui.QImage(x, y ,QtGui.QImage.Format_RGB32)
+		painter = QtGui.QPainter(result)
+		posX = 0
+		for img,y in zip((main,colorAxis,colorBar),yOffs):
+				#draw every part in different positions:
+				painter.drawImage(posX, y, img)
+				posX += img.width()
+		painter.end()
+		#save to file
+		QApplication.clipboard().setImage(result)
 		
 	@inlineCallbacks
 	def setupListener(self, c):
@@ -1061,6 +1101,8 @@ class plotSaved2DWindow(QtGui.QWidget):
 		self.xAxis = self.plotInfo['x axis']
 		self.yAxis = self.plotInfo['y axis']
 		self.zAxis = self.plotInfo['z axis']
+		
+		self.connect(QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL+ QtCore.Qt.Key_D), self), QtCore.SIGNAL('activated()'),self.copyPlotToClip)
 
 		self.notes = ''
 		self.plotTitle = self.plotInfo['title']
@@ -1239,6 +1281,11 @@ class plotSaved2DWindow(QtGui.QWidget):
 
 		
 		self.openFile(self.reactor)
+		
+	def copyPlotToClip(self):
+		self.magic = pg.exporters.ImageExporter(self.viewBig)
+		self.magic.export(fileName = None, toBytes = False, copy = True)
+		print 'copied to clip'
 		
 	def updateTrace(self):
 		pos = self.tracePosBox.value()
@@ -2352,6 +2399,17 @@ class dataVaultExplorer(QtGui.QDialog, Ui_DataVaultExp):
 	def closeEvent(self, e):
 		self.close()
 
+class helpTextWindow(QtGui.QMainWindow, Ui_HelpWindow):
+	def __init__(self, parent = None):
+		super(helpTextWindow, self).__init__(parent)
+		QtGui.QMainWindow.__init__(self)
+		self.window = parent
+		self.setupUi(self)
+		
+	def closeEvent(self, e):
+		self.window.helpBtn.setEnabled(True)
+		self.close()
+		
 if __name__ == "__main__":
 	global app
 	app = QtGui.QApplication([])
