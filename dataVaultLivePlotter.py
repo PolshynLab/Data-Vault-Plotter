@@ -153,35 +153,52 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		indVars, depVars = [x[0] for x in vars[0]], [x[0] for x in vars[1]]
 		for plot in toPlot:
 			if len(plot) == 2:
+				print plot
 				try:
 					title = str(plot[1]) + ' vs. ' + str(plot[0])
 					x_axis, y_axis = str(plot[0]), str(plot[1])
-					x_index, y_index = indVars.index(x_axis), depVars.index(y_axis)+len(indVars)
+					print x_axis, y_axis
+					if (x_axis in indVars): 
+						x_index, y_index = indVars.index(x_axis), depVars.index(y_axis)+len(indVars)
+					else:
+						x_index, y_index = depVars.index(x_axis)+len(indVars), depVars.index(y_axis)+len(indVars)
 					x_rng = params[x_axis + '_rng']
 					x_pnts = params[x_axis + '_pnts']
 					plot1DDict[title] = {'title' : title, 'x axis' : x_axis, 'y axis' : y_axis, 'x index' : x_index, 'y index' : y_index, 'x range' : x_rng, 'x points' : x_pnts}
+					
 				except:
+					print 'Missing info on plot: ', plot
 					missingInfo = True
 			elif len(plot) == 3:
 				try:
 					title = str(plot[2]) + ' vs. ' + str(plot[0]) + ' and ' + str(plot[1])
 					x_axis, y_axis, z_axis = str(plot[0]), str(plot[1]), str(plot[2])
-					x_index, y_index, z_index = indVars.index(x_axis), indVars.index(y_axis), depVars.index(z_axis)+len(indVars)
+					if (x_axis in indVars): 
+						x_index = indVars.index(x_axis)
+					else:
+						x_index = depVars.index(x_axis)+len(indVars)
+					if (y_axis in indVars): 
+						y_index = indVars.index(y_axis)
+					else:
+						y_index = depVars.index(y_axis)+len(indVars)
+					z_index = depVars.index(z_axis)+len(indVars)
 					x_rng = params[x_axis + '_rng']
 					x_pnts = params[x_axis + '_pnts']
 					y_rng = params[y_axis + '_rng']
 					y_pnts = params[y_axis + '_pnts']
 					plot2DDict[title] = {'title' : title, 'x axis' : x_axis, 'y axis' : y_axis, 'z axis' : z_axis, 'x index' : x_index, 'y index' : y_index, 'z index' : z_index , 'x range' : x_rng, 'x points' : x_pnts, 'y range' : y_rng, 'y points' : y_pnts}
 				except:
+					print 'Missing info on plot: ', plot
 					missingInfo = True
 			else:
 				pass
 		if missingInfo == False:
+			print 'opening plots..'
 			yield self.openLivePlots(plot2DDict, plot1DDict, 0, self.reactor)
 			yield self.sleep(0.5)
 
 		else:
-			pass
+			print 'Missing plot info...'
 
 	
 	def update_params(self):
@@ -461,7 +478,7 @@ class plot2DWindow(QtGui.QDialog):
 			newData = yield self.dv.get()
 
 
-			if len(newData[0]) != 0:
+			if len(newData) != 0 and len(newData[0]) != 0:
 				inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex])
 				newData = np.delete(np.asarray(newData), inx, axis = 1)
 				x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.xIndex)[0][0]
@@ -711,7 +728,7 @@ class plot1DWindow(QtGui.QDialog):
 
 			newData = yield self.dv.get()
 			
-			if len(newData[0]) != 0:
+			if len(newData) != 0  and len(newData[0]) != 0:
 
 				inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex])
 				newData = np.delete(np.asarray(newData), inx, axis = 1)
