@@ -421,7 +421,9 @@ class plot2DWindow(QtGui.QDialog):
 			self.pxsize = [self.plotInfo['x points'], self.plotInfo['y points']]
 			self.plotTitle = self.plotInfo['title']
 			if self.plotTitle[0:5] == 'Plot ':
-				self.plotTitle = self.plotInfo['z axis'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis']		
+				self.plotTitle = str(self.fileName) + ': ' + self.plotInfo['z axis'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis']		
+			else:
+				self.plotTitle = str(self.fileName) + ': ' + self.plotTitle
 			self.setWindowTitle(self.plotTitle)
 
 			self.Data = np.array([])
@@ -621,7 +623,9 @@ class plot1DWindow(QtGui.QDialog):
 		self.Data = np.array([])
 		self.plotTitle = self.plotInfo['title']
 		if self.plotTitle[0:5] == 'Plot ':
-			self.plotTitle = self.plotInfo['y axis'] + ' vs. ' + self.plotInfo['x axis']
+			self.plotTitle = str(self.fileName) + ': ' + self.plotInfo['y axis'] + ' vs. ' + self.plotInfo['x axis']
+		else:
+			self.plotTitle = str(self.fileName) + ': ' + self.plotTitle
 		self.setWindowTitle(self.plotTitle)
 		self.xIndex = self.plotInfo['x index']
 		self.yIndex = self.plotInfo['y index']
