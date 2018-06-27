@@ -1912,13 +1912,6 @@ class plotSaved2DWindow(QtGui.QWidget):
 
 		init_loc = os.getcwd()
 		os.chdir(folder)
-		'''
-		if os.path.isfile(file):
-			os.remove(file)
-		if os.path.isfile(self.pdfFile):
-			os.remove(self.pdfFile)
-		'''
-
 		yield self.sleep(0.5)
 		self.pdfNum += 1
 
@@ -2035,6 +2028,7 @@ class plotSaved2DWindow(QtGui.QWidget):
 			self.print_pdf(html, str(fileName))
 		else:
 			tmp_pdf = folder + str(time.time()) + 'tmp_pdf.pdf'
+			toMerge = str(fileName)
 			self.print_pdf(html, str(tmp_pdf))
 			merger = PdfFileMerger()
 			try:
