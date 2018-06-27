@@ -942,9 +942,6 @@ class plot2DWindow(QtGui.QDialog):
 
 		self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 
-		
-		
-
 	def closeEvent(self, e):
 		self.mainWin.existing2DPlotDict.pop(self.plotWinID)
 		self.mainWin.renumPlotDicts(2)
@@ -1517,12 +1514,15 @@ class plotSaved2DWindow(QtGui.QWidget):
 		self.yAxis = self.plotInfo['y axis']
 		self.zAxis = self.plotInfo['z axis']
 		
-		self.connect(QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL+ QtCore.Qt.Key_D), self), QtCore.SIGNAL('activated()'),self.copyPlotToClip)
+		self.connect(QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL+ QtCore.Qt.Key_C), self), QtCore.SIGNAL('activated()'),self.copyPlotToClip)
 
 		self.notes = ''
 		self.plotTitle = self.plotInfo['title']
 		if self.plotTitle[0:5] == 'Plot ':
-			self.plotTitle = self.zAxis + ' vs. ' + self.xAxis + ' and ' + self.yAxis
+			self.plotTitle = str(self.file) + ': ' + self.zAxis + ' vs. ' + self.xAxis + ' and ' + self.yAxis
+		else:
+			self.plotTitle = str(self.file) + ': ' + self.plotTitle
+		self.setWindowTitle(self.plotTitle)
 		self.pdfNum = 1
 		
 		self.resize(800,800)
@@ -1704,8 +1704,31 @@ class plotSaved2DWindow(QtGui.QWidget):
 		self.openFile(self.reactor)
 		
 	def copyPlotToClip(self):
-		self.magic = pg.exporters.ImageExporter(self.viewBig)
-		self.magic.export(fileName = None, toBytes = False, copy = True)
+		r = self.mainPlot.ui.histogram.region.getRegion()
+		self.mainPlot.ui.histogram.vb.setYRange(*r)
+		#create ImageExpoerters:
+		mainExp = pg.exporters.ImageExporter(self.viewBig)
+		colorAxisExp = pg.exporters.ImageExporter(self.mainPlot.ui.histogram.axis)
+		colorBarExp = pg.exporters.ImageExporter(self.mainPlot.ui.histogram.gradient)
+		#create QImages:
+		main =mainExp.export(toBytes=True)
+		colorAxis =colorAxisExp.export(toBytes=True)
+		colorBar = colorBarExp.export(toBytes=True)
+		#define teh size:
+		x = main.width() + colorAxis.width() + colorBar.width()
+		y = main.height()
+		#to get everything in the same height:
+		yOffs = [0,0.5*(y-colorAxis.height()),0.5*(y-colorBar.height())]
+		result = QtGui.QImage(x, y ,QtGui.QImage.Format_RGB32)
+		painter = QtGui.QPainter(result)
+		posX = 0
+		for img,y in zip((main,colorAxis,colorBar),yOffs):
+				#draw every part in different positions:
+				painter.drawImage(posX, y, img)
+				posX += img.width()
+		painter.end()
+		#save to file
+		QApplication.clipboard().setImage(result)
 
 		
 	def updateTrace(self):
@@ -2046,6 +2069,7 @@ class plotSaved2DWindow(QtGui.QWidget):
 		try:
 			if os.path.isfile(self.pdfFile):
 				os.remove(self.pdfFile)
+			if plot >= 3 and os.path.isfile(tmp_pdf):
 				os.remove(tmp_pdf)
 		except Exception as inst:
 			print 'Following error was thrown: '
