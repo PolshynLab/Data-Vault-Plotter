@@ -100,8 +100,6 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		try:
 			self.cxn = yield connectAsync(name = 'dvPlotter')
 			self.dv = yield self.cxn.data_vault
-			self.man = yield self.cxn.manager
-			yield self.man.expire_all()
 		except:
 			print 'Either no LabRad connection or DataVault connection.'
 		
