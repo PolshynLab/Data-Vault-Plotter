@@ -100,8 +100,7 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		try:
 			self.cxn = yield connectAsync(name = 'dvPlotter')
 			self.dv = yield self.cxn.data_vault
-			#self.man = yield self.cxn.manager
-			#yield self.man.expire_all()
+
 		except:
 			print 'Either no LabRad connection or DataVault connection.'
 		
@@ -246,16 +245,14 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 						windowObj = getattr(self, windowName)
 						windowObj.cxn.disconnect()
 						windowObj.close()
-						#self.existing2DPlotDict.pop(windowName, None)
-						#self.renumPlotDicts(2)
+
 				if len(onePlots) < len(self.existing1DPlotDict):
 					for jj in range(len(onePlots), len(self.existing1DPlotDict)):
 						windowName = '1DPlot_' + str(jj)
 						windowObj = getattr(self, windowName)
 						windowObj.cxn.disconnect()
 						windowObj.close()
-						#self.existing1DPlotDict.pop(windowName, None)
-						#self.renumPlotDicts(1)
+
 			except Exception as inst:
 				print 'Following error was thrown: '
 				print inst
@@ -511,7 +508,7 @@ class plot2DWindow(QtGui.QDialog):
 		#fresh specifies if the dataset to be plotted already has data (1) or is empty (0)
 		self.fresh = fresh
 		self.connect(QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL+ QtCore.Qt.Key_C), self), QtCore.SIGNAL('activated()'),self.copyPlotToClip)
-
+		self.autoLevelMainplot = True
 		self.cxnName = None
 		self.definePlotParams()
 	
@@ -582,7 +579,6 @@ class plot2DWindow(QtGui.QDialog):
 			yield self.addListen(self.reactor)
 			newData = yield self.dv.get()
 
-
 			if len(newData) == 0 or len(newData[0]) == 0:
 				pass
 			else:
@@ -594,13 +590,14 @@ class plot2DWindow(QtGui.QDialog):
 				newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
 				newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
-
 				for pt in newData:
 					self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]
 				
-				self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
-				self.isData = True
+				self.mainPlot.setImage(self.plotData, autoRange = False ,  autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+				if self.autoLevelMainplot:
+					self.mainPlot.autoLevels()
 
+				self.isData = True
 			
 		except Exception as inst:
 			print 'Following error was thrown: '
@@ -635,13 +632,23 @@ class plot2DWindow(QtGui.QDialog):
 			self.plotTitleLbl = QtGui.QLabel()
 			self.selectLbl = QtGui.QLabel()
 			self.posLbl = QtGui.QLabel()
+			self.autoHistChk = QtGui.QCheckBox()
+			self.autoHistLbl = QtGui.QLabel()
 			self.lineCutBox = QtGui.QComboBox()
 			self.posBox = QtGui.QDoubleSpinBox()
+			
+			self.autoHistChk.setCheckState(2)
+			self.autoHistChk.stateChanged.connect(self.autoHistFunc)
+
 			
 			self.plotTitleLbl.setText(self.plotTitle)
 			self.plotTitleLbl.setObjectName('plotTitleLbl')
 			self.plotTitleLbl.setStyleSheet("QLabel#plotTitleLbl {background-color: 'black'; color: rgb(131,131,131); font: 11pt;}")
 
+			self.autoHistLbl.setText('Autorange Histogram')
+			self.autoHistLbl.setObjectName('autoHistLbl')
+			self.autoHistLbl.setStyleSheet("QLabel#autoHistLbl {background-color: 'black'; color: rgb(131,131,131); font: 9pt;}")			
+			
 			self.selectLbl.setText('Select Line Cut')
 			self.selectLbl.setObjectName('selectLbl')
 			self.selectLbl.setStyleSheet("QLabel#selectLbl {background-color: 'black'; color: rgb(131,131,131); font: 9pt;}")
@@ -664,6 +671,8 @@ class plot2DWindow(QtGui.QDialog):
 			self.mainLayout = QtGui.QGridLayout(self)
 			self.mainLayout.addWidget(self.stackLayout, *(1,0, 1, 6))
 			self.mainLayout.addWidget(self.plotTitleLbl, *(0,0))
+			self.mainLayout.addWidget(self.autoHistLbl, *(0,2))
+			self.mainLayout.addWidget(self.autoHistChk, *(0,3), alignment = QtCore.Qt.AlignLeft)
 			self.mainLayout.addWidget(self.selectLbl, *(0,4), alignment = QtCore.Qt.AlignRight)
 			self.mainLayout.addWidget(self.lineCutBox, *(0,5), alignment = QtCore.Qt.AlignLeft)
 			self.setLayout(self.mainLayout)
@@ -673,6 +682,22 @@ class plot2DWindow(QtGui.QDialog):
 			self.plotTitleLbl.setText(self.plotTitle)
 			self.plotTitleLbl.setStyleSheet("QLabel#plotTitleLbl {background-color: 'black'; color: rgb(131,131,131); font: 11pt;}")
 
+	
+	def autoHistFunc(self, state):
+		try:
+			
+			if state == 0:
+				self.autoLevelMainplot = False
+
+			elif state == 2:
+				self.autoLevelMainplot = True
+
+
+		except Exception as inst:
+			print 'Following error was thrown: '
+			print inst
+			print 'Error thrown on line: '
+			print sys.exc_traceback.tb_lineno 
 	
 	def toggleTraceFunc(self):
 		jj = self.i % 2
@@ -721,7 +746,9 @@ class plot2DWindow(QtGui.QDialog):
 		else:
 			self.yBins = np.linspace(self.extents[3] - 0.5 * self.yscale, self.extents[2] + 0.5 * self.yscale, self.pxsize[1]+1)
 		
-		self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+		self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+		if self.autoLevelMainplot:
+			self.mainPlot.autoLevels()
 		
 		if state is None:
 			self.plot1DV = pg.PlotWidget()
@@ -873,36 +900,7 @@ class plot2DWindow(QtGui.QDialog):
 		self.stackLayout.setCurrentIndex(jj)
 		self.startIndex = jj
 		
-		
-		
-		
-		
-		'''
-		p = self.palette()
-		p.setColor(self.backgroundRole(), QtGui.QColor(0, 0, 0))
-		self.setPalette(p)
-	
-		self.layout = QtGui.QGridLayout(self)
-		
-		self.viewBig = pg.PlotItem(name = "Plot", title = self.plotTitle)
-		self.viewBig.showAxis('top', show = True)
-		self.viewBig.showAxis('right', show = True)
-		self.viewBig.setLabel('left', self.plotInfo['y axis'])
-		self.viewBig.setLabel('bottom', self.plotInfo['x axis'])
-		self.viewBig.setAspectLocked(lock = False, ratio = 1)
-		self.mainPlot = pg.ImageView(view = self.viewBig)
-		self.mainPlot.ui.menuBtn.hide()
-		self.mainPlot.ui.histogram.item.gradient.loadPreset('bipolar')
-		self.mainPlot.ui.roiBtn.hide()
-		self.mainPlot.ui.menuBtn.hide()
-		self.viewBig.setAspectLocked(False)
-		self.viewBig.invertY(False)
-		self.viewBig.setXRange(-1, 1)
-		self.viewBig.setYRange(-1, 1)
 
-		self.layout.addWidget(self.mainPlot, *(0,0))
-		self.setLayout(self.layout)
-		'''
 		
 			
 	def sleep(self,secs):
@@ -940,7 +938,9 @@ class plot2DWindow(QtGui.QDialog):
 		for pt in newData:
 				self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]
 
-		self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+		self.mainPlot.setImage(self.plotData, autoRange = False,  autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+		if self.autoLevelMainplot:
+			self.mainPlot.autoLevels()
 
 	def closeEvent(self, e):
 		self.mainWin.existing2DPlotDict.pop(self.plotWinID)
@@ -1246,7 +1246,9 @@ class plotSaved1DWindow(QtGui.QWidget):
 		self.notes = ''
 		self.plotTitle = self.plotInfo['title']
 		if self.plotTitle[0:5] == 'Plot ':
-			self.plotTitle = self.yAxis + ' vs. ' + self.xAxis
+			self.plotTitle = str(self.file) + ': ' + self.yAxis + ' vs. ' + self.xAxis
+		else:
+			self.plotTitle = str(self.file) + ': ' + self.plotTitle
 		self.pdfNum = 1
 		
 		self.resize(675,330)
