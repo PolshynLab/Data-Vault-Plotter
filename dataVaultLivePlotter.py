@@ -42,6 +42,8 @@ editInfoGUI = path + r"\editDatasetInfo.ui"
 plotSetupUI = path + r"\plotSetup.ui"
 helpWindowUI = path + r"\helpWindow.ui"
 
+guiIconPath = path + r"\hex.svg"
+
 Ui_MainWin, QtBaseClass = uic.loadUiType(mainWinGUI)
 Ui_ExtPrompt, QtBaseClass = uic.loadUiType(plotExtentGUI)
 Ui_DataVaultExp, QtBaseClass = uic.loadUiType(dvExplorerGUI)
@@ -59,6 +61,9 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		QtGui.QMainWindow.__init__(self)
 		
 		self.setupUi(self)
+		icon = QtGui.QIcon()
+		icon.addPixmap(QtGui.QPixmap(guiIconPath))
+		self.setWindowIcon(icon)
 		self.reactor = reactor
 		
 		self.moveDefault()
@@ -353,7 +358,7 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 					print 'Following error was thrown: '
 					print inst
 					print 'Error thrown on line: '
-					print sys.exc_traceback.tb_lineno 						
+					print sys.exc_traceback.tb_lineno						
 
 	def plotLiveData(self):
 		self.dvExplorer = dataVaultExplorer(self.reactor, 'live', self.listenTo, self)
@@ -400,6 +405,9 @@ class extentPrompt(QtGui.QDialog, Ui_ExtPrompt):
 		self.plotInfo = plotInfo
 		self.mainWin = parent
 		self.setupUi(self)
+		icon = QtGui.QIcon()
+		icon.addPixmap(QtGui.QPixmap(guiIconPath))
+		self.setWindowIcon(icon)
 		
 		self.x0, self.y0 = x0, y0
 		self.moveDefault()
@@ -526,7 +534,6 @@ class plot2DWindow(QtGui.QDialog):
 		else:
 			self.plotTitle = str(self.fileName) + ': ' + self.plotTitle
 		self.setWindowTitle(self.plotTitle)
-
 		self.Data = np.array([])
 		
 		self.setupPlot(state)
@@ -592,10 +599,16 @@ class plot2DWindow(QtGui.QDialog):
 
 				for pt in newData:
 					self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]
-				
-				self.mainPlot.setImage(self.plotData, autoRange = False ,  autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+
+				r0 = np.where(np.all(self.plotData == self.randFill, axis = 0))[0]
+				c0 = np.where(np.all(self.plotData == self.randFill, axis = 1))[0]
+				self.tmp = np.delete(np.delete(self.plotData, r0, axis = 1), c0, axis = 0)
+				argX = np.min([self.extents[0],self.extents[1]]) + self.xscale * np.max(np.append(c0, -1) + 1)
+				argY = np.min([self.extents[2],self.extents[3]]) + self.yscale * np.max(np.append(r0, -1) + 1)
+				self.mainPlot.setImage(self.tmp, autoRange = False ,	 autoLevels = False, pos=[argX, argY],scale=[self.xscale, self.yscale])
 				if self.autoLevelMainplot:
 					self.mainPlot.autoLevels()
+
 
 				self.isData = True
 			
@@ -710,6 +723,25 @@ class plot2DWindow(QtGui.QDialog):
 			self.layout2.addWidget(self.mainPlot, *(0,0))
 		self.i += 1
 	
+	def testHist(self, autoLevel=False, autoRange=False):
+		histTmp = self.tmp - self.randFill
+		w = np.absolute(np.divide(histTmp, histTmp, out = np.zeros_like(histTmp), where = histTmp != 0))
+		step = (int(np.ceil(w.shape[0] / 200)),
+					int(np.ceil(w.shape[1] / 200)))
+		if np.isscalar(step):
+			step = (step, step)
+		stepW = w[::step[0], ::step[1]]
+		stepW = stepW[np.isfinite(stepW)]
+		h = self.mainImage.getHistogram(weights = stepW)
+		if h[0] is None:
+			return
+		self.mainPlot.ui.histogram.plot.setData(*h)
+		if autoLevel:
+			mn = h[0][0]
+			mx = h[0][-1]
+			self.mainPlot.ui.histogram.region.setRegion([mn, mx])
+
+	
 	def defPlots(self, state = None):
 		if state is None:
 			self.vTraceLine = pg.InfiniteLine(pos = self.extents[0], angle = 90, movable = True)
@@ -722,17 +754,26 @@ class plot2DWindow(QtGui.QDialog):
 			self.viewBig.setLabel('left', self.plotInfo['y axis'])
 			self.viewBig.setLabel('bottom', self.plotInfo['x axis'])
 			self.viewBig.setAspectLocked(lock = False, ratio = 1)
-			self.mainPlot = pg.ImageView(view = self.viewBig)
+			self.mainImage = pg.ImageItem()
+			self.mainPlot = pg.ImageView(view = self.viewBig, imageItem = self.mainImage)
+			self.mainImage.sigImageChanged.connect(self.testHist)
 			self.mainPlot.ui.menuBtn.hide()
 			self.mainPlot.ui.histogram.item.gradient.loadPreset('bipolar')
 			self.mainPlot.ui.roiBtn.hide()
 			self.mainPlot.ui.menuBtn.hide()
+			self.viewBig.setXRange(np.min([self.extents[0],self.extents[1]]), np.max([self.extents[0],self.extents[1]]))
+			self.viewBig.setYRange(np.min([self.extents[2],self.extents[3]]), np.max([self.extents[2],self.extents[3]]))
 			self.viewBig.setAspectLocked(False)
 			self.viewBig.invertY(False)
 		else:
 			self.mainPlot.clear()
+			self.viewBig.removeItem(self.rect)
 	
-		self.plotData = np.zeros([self.pxsize[0], self.pxsize[1]])
+		self.randFill = np.random.random() * 1e-3
+		self.plotData = np.full([self.pxsize[0], self.pxsize[1]], self.randFill)
+		self.rect = QtGui.QGraphicsRectItem(np.min([self.extents[0], self.extents[1]]), np.min([self.extents[2], self.extents[3]]), np.absolute(self.extents[1] - self.extents[0]), np.absolute(self.extents[3] - self.extents[2]))
+		self.rect.setBrush(QtGui.QColor('transparent'))
+		self.viewBig.addItem(self.rect)
 		
 		self.xscale, self.yscale = np.absolute((self.extents[1] - self.extents[0])/self.pxsize[0]), np.absolute((self.extents[3] - self.extents[2])/self.pxsize[1])
 		
@@ -746,9 +787,7 @@ class plot2DWindow(QtGui.QDialog):
 		else:
 			self.yBins = np.linspace(self.extents[3] - 0.5 * self.yscale, self.extents[2] + 0.5 * self.yscale, self.pxsize[1]+1)
 		
-		self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
-		if self.autoLevelMainplot:
-			self.mainPlot.autoLevels()
+
 		
 		if state is None:
 			self.plot1DV = pg.PlotWidget()
@@ -938,7 +977,12 @@ class plot2DWindow(QtGui.QDialog):
 		for pt in newData:
 				self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]
 
-		self.mainPlot.setImage(self.plotData, autoRange = False,  autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+		r0 = np.where(np.all(self.plotData == self.randFill, axis = 0))[0]
+		c0 = np.where(np.all(self.plotData == self.randFill, axis = 1))[0]
+		self.tmp = np.delete(np.delete(self.plotData, r0, axis = 1), c0, axis = 0)
+		argX = np.min([self.extents[0],self.extents[1]]) + self.xscale * np.max(np.append(c0, -1) + 1)
+		argY = np.min([self.extents[2],self.extents[3]]) + self.yscale * np.max(np.append(r0, -1) + 1)
+		self.mainPlot.setImage(self.tmp, autoRange = False , autoLevels = False, pos=[argX, argY],scale=[self.xscale, self.yscale])
 		if self.autoLevelMainplot:
 			self.mainPlot.autoLevels()
 
@@ -989,7 +1033,7 @@ class plot1DWindow(QtGui.QDialog):
 		self.setupListener(self.reactor)
 		
 	def restartPlotting(self, newPlotInfo, listenDir, listenFile):
-		print 'restarting plot.....................  ', str(listenFile)
+		print 'restarting plot.....................	 ', str(listenFile)
 		self.dir = listenDir
 		self.fileName = listenFile
 		self.plotInfo = newPlotInfo
@@ -1010,7 +1054,7 @@ class plot1DWindow(QtGui.QDialog):
 		self.setPalette(p)
 	
 		self.layout = QtGui.QGridLayout(self)
-		if 	state is None:
+		if	state is None:
 			self.plot1D = pg.PlotWidget()
 			self.plot1D.showAxis('right', show = True)
 			self.plot1D.showAxis('top', show = True)
@@ -1203,7 +1247,7 @@ class plot1DWindow(QtGui.QDialog):
 			self.oldTraces[0].setData(x = xVals, y = yVals, pen = pg.mkPen(color=self.penColor))
 			self.plot1D.addItem(self.oldTraces[0])
 			i = 1
-			while i <= self.traceCnt and i  <= self.numLines:
+			while i <= self.traceCnt and i	<= self.numLines:
 				self.oldTraces[i].setData(x = self.XplotData[(i)%5], y = self.YplotData[(i)%5], pen = pg.mkPen(color = self.colorWheel[int(self.id+i)%5]))
 				self.plot1D.addItem(self.oldTraces[i])
 				i += 1
@@ -1249,6 +1293,7 @@ class plotSaved1DWindow(QtGui.QWidget):
 			self.plotTitle = str(self.file) + ': ' + self.yAxis + ' vs. ' + self.xAxis
 		else:
 			self.plotTitle = str(self.file) + ': ' + self.plotTitle
+		self.setWindowTitle(self.plotTitle)
 		self.pdfNum = 1
 		
 		self.resize(675,330)
@@ -1912,7 +1957,7 @@ class plotSaved2DWindow(QtGui.QWidget):
 		fold  = self.getSaveData('mat')
 		xVals = np.linspace(self.extents[0], self.extents[1], int(self.numPts[0]))
 		yVals = np.linspace(self.extents[2], self.extents[3], int(self.numPts[1]))
-		xInd, yInd = np.linspace(0,  self.numPts[0] - 1,  int(self.numPts[0])), np.linspace(0,  self.numPts[1] - 1, int(self.numPts[1]))
+		xInd, yInd = np.linspace(0,	 self.numPts[0] - 1,  int(self.numPts[0])), np.linspace(0,	self.numPts[1] - 1, int(self.numPts[1]))
 		zX, zY, zXI, zYI = np.ones([1,int(self.numPts[1])]), np.ones([1,int(self.numPts[0])]), np.ones([1,int(self.numPts[1])]), np.ones([1,int(self.numPts[0])])
 		X, Y,  XI, YI = np.outer(xVals, zX), np.outer(zY, yVals), np.outer(xInd, zXI), np.outer(zYI, yInd)
 		XX, YY, XXI, YYI, ZZ = X.flatten(), Y.flatten(), XI.flatten(), YI.flatten(), self.plotData.flatten()
@@ -2238,6 +2283,9 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 		self.mainWin = parent
 		
 		self.setupUi(self)
+		icon = QtGui.QIcon()
+		icon.addPixmap(QtGui.QPixmap(guiIconPath))
+		self.setWindowIcon(icon)
 		self.moveDefault()
 		
 		self.formFlag = True
@@ -2624,6 +2672,9 @@ class dirExplorer(QtGui.QDialog, Ui_DirExp):
 
 		self.reactor = reactor
 		self.setupUi(self)
+		icon = QtGui.QIcon()
+		icon.addPixmap(QtGui.QPixmap(guiIconPath))
+		self.setWindowIcon(icon)
 		self.moveDefault()
 		
 		self.mainWin = parent
@@ -2752,6 +2803,9 @@ class dataVaultExplorer(QtGui.QDialog, Ui_DataVaultExp):
 		self.source = source
 		self.listenDir = listenDir
 		self.setupUi(self)
+		icon = QtGui.QIcon()
+		icon.addPixmap(QtGui.QPixmap(guiIconPath))
+		self.setWindowIcon(icon)
 		self.moveDefault()
 		
 		self.mainWin = parent
@@ -2884,6 +2938,9 @@ class helpTextWindow(QtGui.QMainWindow, Ui_HelpWindow):
 		QtGui.QMainWindow.__init__(self)
 		self.window = parent
 		self.setupUi(self)
+		icon = QtGui.QIcon()
+		icon.addPixmap(QtGui.QPixmap(guiIconPath))
+		self.setWindowIcon(icon)
 		
 	def closeEvent(self, e):
 		self.window.helpBtn.setEnabled(True)

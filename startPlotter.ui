@@ -28,10 +28,6 @@
   <property name="windowTitle">
    <string>Data Vault Plotter</string>
   </property>
-  <property name="windowIcon">
-   <iconset resource="Resources/dvPlotterResources.qrc">
-    <normaloff>:/dvPlotter/Pictures/data.png</normaloff>:/dvPlotter/Pictures/data.png</iconset>
-  </property>
   <property name="styleSheet">
    <string notr="true">#Dialog{
 	background-color: rgb(0, 0, 0);}</string>
