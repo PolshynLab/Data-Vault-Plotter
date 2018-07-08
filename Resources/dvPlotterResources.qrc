@@ -10,5 +10,10 @@
 	<file>Pictures/sigma.png</file>
 	<file>Pictures/zoom.png</file>
 	<file>Pictures/remove.png</file>
+	<file>Pictures/data.png</file>
+	<file>Pictures/saveMAT.png</file>
+	<file>Pictures/saveMATLAB.png</file>
+	<file>Pictures/savePDF.png</file>
+	<file>Pictures/editNotes.png</file>
   </qresource>
 </RCC>
