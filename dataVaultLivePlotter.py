@@ -985,6 +985,9 @@ class plot2DWindow(QtGui.QDialog):
 		self.mainPlot.setImage(self.tmp, autoRange = False , autoLevels = False, pos=[argX, argY],scale=[self.xscale, self.yscale])
 		if self.autoLevelMainplot:
 			self.mainPlot.autoLevels()
+		pctComplete = int(100 * (self.tmp.shape[0] * self.tmp.shape[1]) / (self.plotData.shape[0] * self.plotData.shape[1]))
+		self.setWindowTitle(self.plotTitle + ' (' + str(pctComplete) + '% Complete)')
+		
 
 	def closeEvent(self, e):
 		self.mainWin.existing2DPlotDict.pop(self.plotWinID)
