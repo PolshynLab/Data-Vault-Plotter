@@ -12,7 +12,7 @@ from twisted.internet.defer import inlineCallbacks, Deferred
 import numpy as np
 import pyqtgraph as pg
 import pyqtgraph.exporters
-import exceptions
+#import exceptions
 import time
 import copy
 import datetime as dt
@@ -262,7 +262,7 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
                 print("Following error was thrown: ")
                 print(str(inst))
                 print("Error thrown on line: ")
-                print(sys.exc_traceback.tb_lineno)
+                print(sys.exc_info()[2])
             plt1, plt2 = len(self.existing1DPlotDict), len(self.existing2DPlotDict)
             
             try: 
@@ -300,7 +300,7 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
                 print("Following error was thrown: ")
                 print(str(inst))
                 print("Error thrown on line: ")
-                print("sys.exc_traceback.tb_lineno")
+                print(sys.exc_info()[2])
         elif fresh == 1:
             try: 
                 x0, y0 = 450, 25
@@ -327,7 +327,7 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
                 print("Following error was thrown: ")
                 print(str(inst))
                 print("Error thrown on line: ")
-                print(sys.exc_traceback.tb_lineno)
+                print(sys.exc_info()[2])
         
         self.allowPlot = True
             
@@ -345,7 +345,7 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
                     print("Following error was thrown: ")
                     print(str(inst))
                     print("Error thrown on line: ")
-                    print(sys.exc_traceback.tb_lineno) 
+                    print(sys.exc_info()[2]) 
         elif dim == 1:
             for plot in allPlots:
                 try:
@@ -358,7 +358,7 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
                     print("Following error was thrown: ")
                     print(str(inst))
                     print("Error thrown on line: ")
-                    print(sys.exc_traceback.tb_lineno)                      
+                    print(sys.exc_info()[2])                      
 
     def plotLiveData(self):
         self.dvExplorer = dataVaultExplorer(self.reactor, 'live', self.listenTo, self)
@@ -616,7 +616,7 @@ class plot2DWindow(QtGui.QDialog):
             print("Following error was thrown: ")
             print(str(inst))
             print("Error thrown on line: ")
-            print(sys.exc_traceback.tb_lineno) 
+            print(sys.exc_info()[2]) 
     @inlineCallbacks
     def addListen(self, c):
         yield self.dv.signal__data_available(self.id)
@@ -710,7 +710,7 @@ class plot2DWindow(QtGui.QDialog):
             print("Following error was thrown: ")
             print(str(inst))
             print("Error thrown on line: ")
-            print(sys.exc_traceback.tb_lineno)
+            print(sys.exc_info()[2])
     
     def toggleTraceFunc(self):
         jj = self.i % 2
@@ -969,7 +969,7 @@ class plot2DWindow(QtGui.QDialog):
             print("Following error was thrown: ")
             print(str(inst))
             print("Error thrown on line: ")
-            print(sys.exc_traceback.tb_lineno) 
+            print(sys.exc_info()[2]) 
     @inlineCallbacks
     def plotMore(self, newData, x_ind, y_ind, z_ind, c):
         yield self.sleep(0.1)
@@ -1187,7 +1187,7 @@ class plot1DWindow(QtGui.QDialog):
             print("Following error was thrown: ")
             print(str(inst))
             print("Error thrown on line: ")
-            print(sys.exc_traceback.tb_lineno)
+            print(sys.exc_info()[2])
             
     @inlineCallbacks
     def addListen(self, c):
@@ -1258,7 +1258,7 @@ class plot1DWindow(QtGui.QDialog):
             print("Following error was thrown: ")
             print(str(inst))
             print("Error thrown on line: ")
-            print(sys.exc_traceback.tb_lineno) 
+            print(sys.exc_info()[2]) 
     def sleep(self,secs):
         d = Deferred()
         self.reactor.callLater(secs,d.callback,'Sleeping')
@@ -1888,7 +1888,7 @@ class plotSaved2DWindow(QtGui.QWidget):
             print("Following error was thrown: ")
             print(str(inst))
             print("Error thrown on line: ")
-            print(sys.exc_traceback.tb_lineno)
+            print(sys.exc_info()[2])
         
         self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[self.x0, self.y0],scale=[self.xscale, self.yscale])
         
@@ -2095,7 +2095,7 @@ class plotSaved2DWindow(QtGui.QWidget):
             print("Following error was thrown: ")
             print(str(inst))
             print("Error thrown on line: ")
-            print(sys.exc_traceback.tb_lineno)
+            print(sys.exc_info()[2])
         
         if plot < 3:
             self.print_pdf(html, str(fileName))
@@ -2113,7 +2113,7 @@ class plotSaved2DWindow(QtGui.QWidget):
                 print("Following error was thrown: ")
                 print(str(inst))
                 print("Error thrown on line: ")
-                print(sys.exc_traceback.tb_lineno)
+                print(sys.exc_info()[2])
         tmp_loc = ''
         yield self.sleep(0.5)
         try:
@@ -2125,7 +2125,7 @@ class plotSaved2DWindow(QtGui.QWidget):
             print("Following error was thrown: ")
             print(str(inst))
             print("Error thrown on line: ")
-            print(sys.exc_traceback.tb_lineno)
+            print(sys.exc_info()[2])
         os.chdir(init_loc)
         
         
@@ -2640,7 +2640,7 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
                 print("Following error was thrown: ")
                 print(str(inst))
                 print("Error thrown on line: ")
-                print(sys.exc_traceback.tb_lineno) 
+                print(sys.exc_info()[2]) 
         elif self.fresh == 2:
             print("2D Info: ", self.plot2DInfo)
             print("1D Info: ", self.plot1DInfo)
