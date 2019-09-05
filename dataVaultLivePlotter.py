@@ -2,12 +2,14 @@ from __future__ import division
 import sys
 import os
 import os.path
+from pathlib import Path
 import twisted
-from PyQt4 import QtCore, QtGui, QtTest, uic
-from PyQt4.QtGui import *
-from PyQt4.QtCore import *
-from PyQt4.QtGui import QApplication, QPrinter
-from PyQt4.QtWebKit import QWebView
+from PyQt5 import QtCore, QtGui, QtTest, uic, QtWidgets, QtPrintSupport
+from PyQt5.QtGui import *
+from PyQt5.QtCore import *
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtPrintSupport import QPrinter
+from PyQt5.QtWebEngineWidgets import QWebEngineView
 from twisted.internet.defer import inlineCallbacks, Deferred
 import numpy as np
 import pyqtgraph as pg
@@ -28,21 +30,19 @@ except:
     print("--------------PyPDF2 not installed... Merge PDF function disabled--------------")
 
 
-
-path = sys.path[0]
-
-sys.path.append(sys.path[0] + '\Resources')
+path = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(os.path.join(path, 'Resources'))
 import dvPlotterResources_rc
 
-mainWinGUI = path + r"\startPlotter.ui"
-plotExtentGUI = path + r"\extentPrompt.ui"
-dvExplorerGUI = path + r"\dvExplorer.ui"
-dirExplorerGUI = path + r"\dirExplorer.ui"
-editInfoGUI = path + r"\editDatasetInfo.ui"
-plotSetupUI = path + r"\plotSetup.ui"
-helpWindowUI = path + r"\helpWindow.ui"
+mainWinGUI = os.path.join(path, 'startPlotter.ui')
+plotExtentGUI = os.path.join(path, 'extentPrompt.ui')
+dvExplorerGUI = os.path.join(path, 'dvExplorer.ui')
+dirExplorerGUI = os.path.join(path, 'dirExplorer.ui')
+editInfoGUI = os.path.join(path, 'editDatasetInfo.ui')
+plotSetupUI = os.path.join(path, 'plotSetup.ui')
+helpWindowUI = os.path.join(path, 'helpWindow.ui')
 
-guiIconPath = path + r"\hex.svg"
+guiIconPath = os.path.join(path, 'hex.svg')
 
 Ui_MainWin, QtBaseClass = uic.loadUiType(mainWinGUI)
 Ui_ExtPrompt, QtBaseClass = uic.loadUiType(plotExtentGUI)
@@ -2952,8 +2952,8 @@ class helpTextWindow(QtGui.QMainWindow, Ui_HelpWindow):
 if __name__ == "__main__":
     global app
     app = QtGui.QApplication([])
-    from qtreactor import pyqt4reactor
-    pyqt4reactor.install()
+    import qt5reactor
+    qt5reactor.install()
     from twisted.internet import reactor
     window = dvPlotter(reactor)
     window.show()
