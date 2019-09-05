@@ -118,7 +118,7 @@ border-radius: 5px
    </property>
    <property name="styleSheet">
     <string notr="true">background-color: black;
-text-color: rgb(131,131,131);</string>
+color: rgb(131,131,131);</string>
    </property>
    <property name="frameShape">
     <enum>QFrame::StyledPanel</enum>
