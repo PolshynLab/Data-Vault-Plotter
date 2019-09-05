@@ -433,11 +433,11 @@ class extentPrompt(QtGui.QDialog, Ui_ExtPrompt):
         headers = [min, max, pts]
         
         min.setText('Minimum Value')        
-        min.setTextColor(QtGui.QColor(131,131,131))
+        min.setForeground(QBrush(QColor(131,131,131)))
         max.setText('Maximum Value')
-        max.setTextColor(QtGui.QColor(131,131,131))
+        max.setForeground(QBrush(QColor(131,131,131)))
         pts.setText('Number of Points')
-        pts.setTextColor(QtGui.QColor(131,131,131))
+        pts.setForeground(QBrush(QColor(131,131,131)))
 
         for ii in range(0, 3):
             self.extTable.setItem(0, ii+1, headers[ii])
@@ -1547,7 +1547,7 @@ class plotSaved1DWindow(QtGui.QWidget):
         if self.noteEdits.accepted:
             self.notes = self.noteEdits.textEditor.toPlainText()
         
-class plotSaved2DWindow(QtGui.QWidget):
+class plotSaved2DWindow(QtWidgets.QWidget):
     def __init__(self, reactor, fileDV, dir, plotInfo, yMovePos ):
         super(plotSaved2DWindow, self).__init__()
 
@@ -2368,26 +2368,26 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
         headers = [lbl1, x1, y1, lbl2, x2, y2, z2]
         
         num1.setText('Plot')
-        num1.setTextColor(QtGui.QColor(131,131,131))
+        num1.setForeground(QBrush(QColor(131,131,131)))
         num2.setText('Plot')
-        num2.setTextColor(QtGui.QColor(131,131,131))
+        num2.setForeground(QBrush(QColor(131,131,131)))
         
         lbl1.setText('Plot Title')
-        lbl1.setTextColor(QtGui.QColor(131,131,131))
+        lbl1.setForeground(QBrush(QColor(131,131,131)))
         lbl2.setText('Plot Title')
-        lbl2.setTextColor(QtGui.QColor(131,131,131))
+        lbl2.setForeground(QBrush(QColor(131,131,131)))
         
         x1.setText('X Axis')
-        x1.setTextColor(QtGui.QColor(131,131,131))
+        x1.setForeground(QBrush(QColor(131,131,131)))
         y1.setText('Y Axis')
-        y1.setTextColor(QtGui.QColor(131,131,131))
+        y1.setForeground(QBrush(QColor(131,131,131)))
         
         x2.setText('X Axis')
-        x2.setTextColor(QtGui.QColor(131,131,131))
+        x2.setForeground(QBrush(QColor(131,131,131)))
         y2.setText('Y Axis')
-        y2.setTextColor(QtGui.QColor(131,131,131))
+        y2.setForeground(QBrush(QColor(131,131,131)))
         z2.setText('Z Axis')
-        z2.setTextColor(QtGui.QColor(131,131,131))
+        z2.setForeground(QBrush(QColor(131,131,131)))
         
         for ii in range(0, 3):
             self.onePlots.setItem(0, ii, headers[ii])
@@ -2414,7 +2414,7 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
                 for r in range(0, self.onePlots.rowCount()):
                     if self.onePlots.item(r, c) != None:
                         self.onePlots.item(r, c).setBackground(QtGui.QColor(0,0,0))
-                        self.onePlots.item(r, c).setTextColor(QtGui.QColor(131,131,131))
+                        self.onePlots.item(r, c).setForeground(QBrush(QColor(131,131,131)))
                         if c != 0:
                             self.onePlots.item(r, c).setFlags(QtCore.Qt.NoItemFlags)
                         elif c == 0 and r != 0:
@@ -2422,14 +2422,14 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
                             item = self.onePlots.item(r, c)
                             if item.text() == '':
                                 item.setText(self.backtext1)
-                            item.setBackgroundColor(QtGui.QColor(100,100,150))
-                            item.setTextColor(QtGui.QColor(0,0,0))
+                            item.setBackground(QBrush(QColor(100,100,150)))
+                            item.setForeground(QBrush(QColor(0,0,0)))
         elif num ==2:
             for c in range(0, 4):
                 for r in range(0, self.twoPlots.rowCount()):
                     if self.twoPlots.item(r, c) != None:
                         self.twoPlots.item(r, c).setBackground(QtGui.QColor(0,0,0))
-                        self.twoPlots.item(r, c).setTextColor(QtGui.QColor(131,131,131))    
+                        self.twoPlots.item(r, c).setForeground(QBrush(QColor(131,131,131)))    
                         if c != 0:
                             self.twoPlots.item(r, c).setFlags(QtCore.Qt.NoItemFlags)
                         elif c == 0 and r != 0:
@@ -2437,8 +2437,8 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
                             item = self.twoPlots.item(r, c)
                             if item.text() == '':
                                 item.setText(self.backtext2)
-                            item.setBackgroundColor(QtGui.QColor(100,100,150))
-                            item.setTextColor(QtGui.QColor(0,0,0))
+                            item.setBackground(QBrush(QColor(100,100,150)))
+                            item.setForeground(QBrush(QColor(0,0,0)))
         else:
             pass
         self.formFlag = True
@@ -2720,10 +2720,10 @@ class dirExplorer(QtGui.QDialog, Ui_DirExp):
         l = yield self.dv.dir()
         for i in l[0]:
             self.dirList.addItem(i)
-            self.dirList.item(self.dirList.count() - 1).setTextColor(QtGui.QColor(131,131,131))
+            self.dirList.item(self.dirList.count() - 1).setForeground(QBrush(QColor(131,131,131)))
         for i in l[1]:
             self.fileList.addItem(i)
-            self.fileList.item(self.fileList.count() - 1).setTextColor(QtGui.QColor(131,131,131))
+            self.fileList.item(self.fileList.count() - 1).setForeground(QBrush(QColor(131,131,131)))
         if self.currentDir[-1] == '':
             
             self.dirName.setText('Root')
@@ -2853,10 +2853,10 @@ class dataVaultExplorer(QtGui.QDialog, Ui_DataVaultExp):
         l = yield self.dv.dir()
         for i in l[0]:
             self.dirList.addItem(i)
-            self.dirList.item(self.dirList.count() - 1).setTextColor(QtGui.QColor(131,131,131))
+            self.dirList.item(self.dirList.count() - 1).setForeground(QBrush(QColor(131,131,131)))
         for i in l[1]:
             self.fileList.addItem(i)
-            self.fileList.item(self.fileList.count() - 1).setTextColor(QtGui.QColor(131,131,131))
+            self.fileList.item(self.fileList.count() - 1).setForeground(QBrush(QColor(131,131,131)))
         if self.currentDir[-1] == '':
             
             self.dirName.setText('Root')
