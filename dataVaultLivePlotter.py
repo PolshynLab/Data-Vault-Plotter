@@ -459,7 +459,7 @@ class extentPrompt(QtGui.QDialog, Ui_ExtPrompt):
             for c in range(1, 4):
                 item = QtGui.QTableWidgetItem()
                 self.extTable.setItem(r, c, item)
-                self.extTable.item(r, c).setBackgroundColor(QtGui.QColor(255,255,255))
+                self.extTable.item(r, c).setBackground(QBrush(QColor(255,255,255)))
 
     def moveDefault(self):
         self.move(self.x0, self.y0)
@@ -470,7 +470,7 @@ class extentPrompt(QtGui.QDialog, Ui_ExtPrompt):
         
         for r in range(1, len(self.plotInfo) + 1):
             for c in range(1, 4):
-                self.extTable.item(r, c).setBackgroundColor(QtGui.QColor(255,255,255))
+                self.extTable.item(r, c).setBackground(QBrush(QColor(255,255,255)))
         
         for r in range(1, self.extTable.rowCount()):
             try:
@@ -495,7 +495,7 @@ class extentPrompt(QtGui.QDialog, Ui_ExtPrompt):
             self.accept()
         else:
             for ii in range(0, len(errCell)):
-                self.extTable.item(errCell[ii][0], errCell[ii][1]).setBackgroundColor(QtGui.QColor(250,190,160))
+                self.extTable.item(errCell[ii][0], errCell[ii][1]).setBackground(QBrush(QColor(250,190,160)))
                 
     def closeEvent(self, e):
         self.reject()
@@ -1353,13 +1353,13 @@ class plotSaved1DWindow(QtGui.QWidget):
         self.backBtn1.setStyleSheet("QPushButton#backBtn1 {color:rgb(131,131,131);background-color:black;border: 2px solid rgb(131,131,131);border-radius: 5px; height: 38px; width: 70px}")
         
         self.saveMATBtn.setObjectName('saveMATBtn')
-        self.saveMATBtn.setStyleSheet("QPushButton#saveMATBtn {image:url(:/dvPlotter/Pictures/saveMATLAB.png);background-color: transparent; height: 23px; width: 23px;}")
+        self.saveMATBtn.setStyleSheet("QPushButton#saveMATBtn {border-image:url(:/dvPlotter/Pictures/saveMATLAB.png);background-color: transparent; height: 23px; width: 23px;}")
         self.savePDFBtn.setObjectName('savePDFBtn')
-        self.savePDFBtn.setStyleSheet("QPushButton#savePDFBtn {image:url(:/dvPlotter/Pictures/savePDF.png);background-color: transparent; height: 23px; width: 23px;}")
+        self.savePDFBtn.setStyleSheet("QPushButton#savePDFBtn {border-image:url(:/dvPlotter/Pictures/savePDF.png);background-color: transparent; height: 23px; width: 23px;}")
         self.editNotesBtn.setObjectName('editNotesBtn')
-        self.editNotesBtn.setStyleSheet("QPushButton#editNotesBtn {image:url(:/dvPlotter/Pictures/editNotes.png);background-color: transparent; height: 15px; width: 23px;}")
+        self.editNotesBtn.setStyleSheet("QPushButton#editNotesBtn {border-image:url(:/dvPlotter/Pictures/editNotes.png);background-color: transparent; height: 15px; width: 23px;}")
         self.openDVBtn.setObjectName('openDVBtn')
-        self.openDVBtn.setStyleSheet("QPushButton#openDVBtn {image:url(:/dvPlotter/Pictures/browse.png); background-color: transparent; height: 18px; width: 18px;}")
+        self.openDVBtn.setStyleSheet("QPushButton#openDVBtn {border-image:url(:/dvPlotter/Pictures/browse.png); background-color: transparent; height: 18px; width: 18px;}")
         
         self.layout.setColumnStretch(0, 1)
         self.layout.setColumnStretch(1,5)
@@ -1564,8 +1564,8 @@ class plotSaved2DWindow(QtWidgets.QWidget):
         self.yAxis = self.plotInfo['y axis']
         self.zAxis = self.plotInfo['z axis']
         
-        self.connect(QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL+ QtCore.Qt.Key_C), self), QtCore.SIGNAL('activated()'),self.copyPlotToClip)
-
+        #self.connect(QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL+ QtCore.Qt.Key_C), self), QtCore.SIGNAL('activated()'),self.copyPlotToClip)
+        QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL+ QtCore.Qt.Key_C), self).activated.connect(self.copyPlotToClip)
         self.notes = ''
         self.plotTitle = self.plotInfo['title']
         if self.plotTitle[0:5] == 'Plot ':
@@ -1698,13 +1698,13 @@ class plotSaved2DWindow(QtWidgets.QWidget):
         self.backBtn1.setStyleSheet("QPushButton#backBtn1 {color:rgb(131,131,131);background-color:black;border: 2px solid rgb(131,131,131);border-radius: 5px; height: 38px; width: 70px}")
         
         self.saveMATBtn.setObjectName('saveMATBtn')
-        self.saveMATBtn.setStyleSheet("QPushButton#saveMATBtn {image:url(:/dvPlotter/Pictures/saveMATLAB.png);background-color: transparent; height: 23px; width: 23px;}")
+        self.saveMATBtn.setStyleSheet("QPushButton#saveMATBtn {border-image:url(:/dvPlotter/Pictures/saveMATLAB.png);background-color: transparent; height: 23px; width: 23px;}")
         self.savePDFBtn.setObjectName('savePDFBtn')
-        self.savePDFBtn.setStyleSheet("QPushButton#savePDFBtn {image:url(:/dvPlotter/Pictures/savePDF.png);background-color: transparent; height: 23px; width: 23px;}")
+        self.savePDFBtn.setStyleSheet("QPushButton#savePDFBtn {border-image:url(:/dvPlotter/Pictures/savePDF.png);background-color: transparent; height: 23px; width: 23px;}")
         self.editNotesBtn.setObjectName('editNotesBtn')
-        self.editNotesBtn.setStyleSheet("QPushButton#editNotesBtn {image:url(:/dvPlotter/Pictures/editNotes.png);background-color: transparent; height: 15px; width: 23px;}")
+        self.editNotesBtn.setStyleSheet("QPushButton#editNotesBtn {border-image:url(:/dvPlotter/Pictures/editNotes.png);background-color: transparent; height: 15px; width: 23px;}")
         self.openDVBtn.setObjectName('openDVBtn')
-        self.openDVBtn.setStyleSheet("QPushButton#openDVBtn {image:url(:/dvPlotter/Pictures/browse.png); background-color: transparent; height: 18px; width: 18px;}")
+        self.openDVBtn.setStyleSheet("QPushButton#openDVBtn {border-image:url(:/dvPlotter/Pictures/browse.png); background-color: transparent; height: 18px; width: 18px;}")
         
         
 
@@ -2188,9 +2188,13 @@ class textEditor(QtGui.QPlainTextEdit):
         
         self.lineNumberArea = LineNumberArea(self)
 
-        self.connect(self, QtCore.SIGNAL('blockCountChanged(int)'), self.updateLineNumberAreaWidth)
-        self.connect(self, QtCore.SIGNAL('updateRequest(QRect,int)'), self.updateLineNumberArea)
-        self.connect(self, QtCore.SIGNAL('cursorPositionChanged()'), self.highlightCurrentLine)
+        #self.connect(self, QtCore.SIGNAL('blockCountChanged(int)'), self.updateLineNumberAreaWidth)
+        #self.connect(self, QtCore.SIGNAL('updateRequest(QRect,int)'), self.updateLineNumberArea)
+        #self.connect(self, QtCore.SIGNAL('cursorPositionChanged()'), self.highlightCurrentLine)
+
+        self.blockCountChanged.connect(self.updateLineNumberAreaWidth)
+        self.updateRequest.connect(self.updateLineNumberArea)
+        self.cursorPositionChanged.connect(self.highlightCurrentLine)
 
         self.updateLineNumberAreaWidth(0)
 

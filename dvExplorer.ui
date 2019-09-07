@@ -78,13 +78,13 @@ border-radius: 5px
    </property>
    <property name="styleSheet">
     <string notr="true">QPushButton#home{
-image:url(:/dvPlotter/Pictures/home.png);
+border-image:url(:/dvPlotter/Pictures/home.png);
 background: black;
 
 }
 
 QPushButton:pressed#home{
-image:url(:/dvPlotter/Pictures/home.png);
+border-image:url(:/dvPlotter/Pictures/home.png);
 background: black;
 border: 2px rgb(131,131,131);
 border-radius: 5px
@@ -176,13 +176,13 @@ color: rgb(131,131,131);</string>
    </property>
    <property name="styleSheet">
     <string notr="true">QPushButton#back{
-image:url(:/dvPlotter/Pictures/back.png);
+border-image:url(:/dvPlotter/Pictures/back.png);
 background: black;
 
 }
 
 QPushButton:pressed#back{
-image:url(:/dvPlotter/Pictures/back.png);
+border-image:url(:/dvPlotter/Pictures/back.png);
 background: black;
 border: 2px rgb(131,131,131);
 border-radius: 5px
@@ -250,13 +250,13 @@ border-radius: 5px
    </property>
    <property name="styleSheet">
     <string notr="true">QPushButton#addDir{
-image:url(:/dvPlotter/Pictures/add.png);
+border-image:url(:/dvPlotter/Pictures/add.png);
 background: black;
 
 }
 
 QPushButton:pressed#addDir{
-image:url(:/dvPlotter/Pictures/add.png);
+border-image:url(:/dvPlotter/Pictures/add.png);
 background: black;
 border: 2px rgb(131,131,131);
 border-radius: 5px
@@ -264,6 +264,9 @@ border-radius: 5px
    </property>
    <property name="text">
     <string/>
+   </property>
+   <property name="flat">
+    <bool>false</bool>
    </property>
   </widget>
   <widget class="QPushButton" name="refresh">
@@ -275,18 +278,21 @@ border-radius: 5px
      <height>23</height>
     </rect>
    </property>
+   <property name="cursor">
+    <cursorShape>ArrowCursor</cursorShape>
+   </property>
    <property name="toolTip">
     <string>Refresh</string>
    </property>
    <property name="styleSheet">
     <string notr="true">QPushButton#refresh{
-image:url(:/dvPlotter/Pictures/refresh.png);
+border-image:url(:/dvPlotter/Pictures/refresh.png);
 background: black;
 
 }
 
 QPushButton:pressed#refresh{
-image:url(:/dvPlotter/Pictures/refresh.png);
+border-image:url(:/dvPlotter/Pictures/refresh.png);
 background: black;
 border: 2px rgb(131,131,131);
 border-radius: 5px
