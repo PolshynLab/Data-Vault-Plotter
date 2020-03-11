@@ -272,13 +272,13 @@ border-radius: 5px
    </property>
    <property name="styleSheet">
     <string notr="true">QPushButton#add2D{
-border-image:url(:/dvPlotter/Pictures/add.png);
+image:url(:/dvPlotter/Pictures/add.png);
 background: black;
 
 }
 
 QPushButton:pressed#add2D{
-border-image:url(:/dvPlotter/Pictures/add.png);
+image:url(:/dvPlotter/Pictures/add.png);
 background: black;
 border: 2px rgb(131,131,131);
 border-radius: 5px
@@ -305,13 +305,13 @@ border-radius: 5px
    </property>
    <property name="styleSheet">
     <string notr="true">QPushButton#add1D{
-border-image:url(:/dvPlotter/Pictures/add.png);
+image:url(:/dvPlotter/Pictures/add.png);
 background: black;
 
 }
 
 QPushButton:pressed#add1D{
-border-image:url(:/dvPlotter/Pictures/add.png);
+image:url(:/dvPlotter/Pictures/add.png);
 background: black;
 border: 2px rgb(131,131,131);
 border-radius: 5px
@@ -338,13 +338,13 @@ border-radius: 5px
    </property>
    <property name="styleSheet">
     <string notr="true">QPushButton#rmv2D{
-border-image:url(:/dvPlotter/Pictures/remove.png);
+image:url(:/dvPlotter/Pictures/remove.png);
 background: black;
 
 }
 
 QPushButton:pressed#rmv2D{
-border-image:url(:/dvPlotter/Pictures/remove.png);
+image:url(:/dvPlotter/Pictures/remove.png);
 background: black;
 border: 2px rgb(131,131,131);
 border-radius: 5px
@@ -371,13 +371,13 @@ border-radius: 5px
    </property>
    <property name="styleSheet">
     <string notr="true">QPushButton#rmv1D{
-border-image:url(:/dvPlotter/Pictures/remove.png);
+image:url(:/dvPlotter/Pictures/remove.png);
 background: black;
 
 }
 
 QPushButton:pressed#rmv1D{
-border-image:url(:/dvPlotter/Pictures/remove.png);
+image:url(:/dvPlotter/Pictures/remove.png);
 background: black;
 border: 2px rgb(131,131,131);
 border-radius: 5px

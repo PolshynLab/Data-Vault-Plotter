@@ -78,13 +78,13 @@ border-radius: 5px
    </property>
    <property name="styleSheet">
     <string notr="true">QPushButton#home{
-border-image:url(:/dvPlotter/Pictures/home.png);
+image:url(:/dvPlotter/Pictures/home.png);
 background: black;
 
 }
 
 QPushButton:pressed#home{
-border-image:url(:/dvPlotter/Pictures/home.png);
+image:url(:/dvPlotter/Pictures/home.png);
 background: black;
 border: 2px rgb(131,131,131);
 border-radius: 5px
@@ -118,7 +118,7 @@ border-radius: 5px
    </property>
    <property name="styleSheet">
     <string notr="true">background-color: black;
-color: rgb(131,131,131);</string>
+text-color: rgb(131,131,131);</string>
    </property>
    <property name="frameShape">
     <enum>QFrame::StyledPanel</enum>
@@ -176,13 +176,13 @@ color: rgb(131,131,131);</string>
    </property>
    <property name="styleSheet">
     <string notr="true">QPushButton#back{
-border-image:url(:/dvPlotter/Pictures/back.png);
+image:url(:/dvPlotter/Pictures/back.png);
 background: black;
 
 }
 
 QPushButton:pressed#back{
-border-image:url(:/dvPlotter/Pictures/back.png);
+image:url(:/dvPlotter/Pictures/back.png);
 background: black;
 border: 2px rgb(131,131,131);
 border-radius: 5px
@@ -250,13 +250,13 @@ border-radius: 5px
    </property>
    <property name="styleSheet">
     <string notr="true">QPushButton#addDir{
-border-image:url(:/dvPlotter/Pictures/add.png);
+image:url(:/dvPlotter/Pictures/add.png);
 background: black;
 
 }
 
 QPushButton:pressed#addDir{
-border-image:url(:/dvPlotter/Pictures/add.png);
+image:url(:/dvPlotter/Pictures/add.png);
 background: black;
 border: 2px rgb(131,131,131);
 border-radius: 5px
@@ -280,13 +280,13 @@ border-radius: 5px
    </property>
    <property name="styleSheet">
     <string notr="true">QPushButton#refresh{
-border-image:url(:/dvPlotter/Pictures/refresh.png);
+image:url(:/dvPlotter/Pictures/refresh.png);
 background: black;
 
 }
 
 QPushButton:pressed#refresh{
-border-image:url(:/dvPlotter/Pictures/refresh.png);
+image:url(:/dvPlotter/Pictures/refresh.png);
 background: black;
 border: 2px rgb(131,131,131);
 border-radius: 5px
