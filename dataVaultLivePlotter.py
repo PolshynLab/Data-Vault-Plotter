@@ -1,38 +1,28 @@
-from __future__ import division
+
 import sys
 import os
 import os.path
 import twisted
-from PyQt4 import QtCore, QtGui, QtTest, uic
-from PyQt4.QtGui import *
-from PyQt4.QtCore import *
-from PyQt4.QtGui import QApplication, QPrinter
-from PyQt4.QtWebKit import QWebView
+from PyQt5 import QtCore, QtGui, QtTest, uic
+from jinja2 import Environment, PackageLoader
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtPrintSupport import QPrinter
+#from PyQt5.QtWebKit import QWebView
 from twisted.internet.defer import inlineCallbacks, Deferred
 import numpy as np
 import pyqtgraph as pg
 import pyqtgraph.exporters
-import exceptions
+# import exceptions
 import time
 import copy
 import datetime as dt
 import scipy.io as sio
 import scipy.stats as spst
-try:
-	from jinja2 import Environment, PackageLoader
-except:
-	print '--------------jinja2 not installed... Create PDF function disabled--------------'
-try:
-	from PyPDF2 import PdfFileMerger, PdfFileReader
-except:
-	print '--------------PyPDF2 not installed... Merge PDF function disabled--------------'
-
-
 
 path = sys.path[0]
 
 sys.path.append(sys.path[0] + '\Resources')
-import dvPlotterResources_rc
+#import dvPlotterResources_rc
 
 mainWinGUI = path + r"\startPlotter.ui"
 plotExtentGUI = path + r"\extentPrompt.ui"
@@ -40,9 +30,6 @@ dvExplorerGUI = path + r"\dvExplorer.ui"
 dirExplorerGUI = path + r"\dirExplorer.ui"
 editInfoGUI = path + r"\editDatasetInfo.ui"
 plotSetupUI = path + r"\plotSetup.ui"
-helpWindowUI = path + r"\helpWindow.ui"
-
-guiIconPath = path + r"\hex.svg"
 
 Ui_MainWin, QtBaseClass = uic.loadUiType(mainWinGUI)
 Ui_ExtPrompt, QtBaseClass = uic.loadUiType(plotExtentGUI)
@@ -50,20 +37,15 @@ Ui_DataVaultExp, QtBaseClass = uic.loadUiType(dvExplorerGUI)
 Ui_DirExp, QtBaseClass = uic.loadUiType(dirExplorerGUI)
 Ui_EditDataInfo, QtBaseClass = uic.loadUiType(editInfoGUI)
 Ui_PlotSetup, QtBaseClass = uic.loadUiType(plotSetupUI)
-Ui_HelpWindow, QtBaseClass = uic.loadUiType(helpWindowUI)
 
 ID_NEWDATA = 999
 
-	
 class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 	def __init__(self, reactor, parent = None):
 		super(dvPlotter, self).__init__(parent)
 		QtGui.QMainWindow.__init__(self)
 		
 		self.setupUi(self)
-		icon = QtGui.QIcon()
-		icon.addPixmap(QtGui.QPixmap(guiIconPath))
-		self.setWindowIcon(icon)
 		self.reactor = reactor
 		
 		self.moveDefault()
@@ -73,8 +55,6 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		self.listen.clicked.connect(self.setupListener)
 		self.closeWin.clicked.connect(self.closePlotter)
 		self.plotLive.clicked.connect(self.plotLiveData)
-		
-		self.helpBtn.clicked.connect(self.openHelpWindow)
 		
 		self.changeDir.setEnabled(False)
 		self.plotLive.setEnabled(False)
@@ -86,18 +66,11 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		self.allowPlot = False
 		
 		self.savePlotList = []
-		self.existing2DPlotDict = {}
-		self.existing1DPlotDict = {}
 		
 		self.listenTo = ['']
 		
 	def moveDefault(self):
 		self.move(25,25)
-		
-	def openHelpWindow(self):
-		self.helpWindowDlg = helpTextWindow(self)
-		self.helpWindowDlg.show()
-		self.helpBtn.setEnabled(False)
 		
 	@inlineCallbacks
 	def initReact(self, c):
@@ -105,9 +78,10 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		try:
 			self.cxn = yield connectAsync(name = 'dvPlotter')
 			self.dv = yield self.cxn.data_vault
-
+			self.man = yield self.cxn.manager
+			yield self.man.expire_all()
 		except:
-			print 'Either no LabRad connection or DataVault connection.'
+			print('Either no LabRad connection or DataVault connection.')
 		
 	@inlineCallbacks
 	def initListener(self, c):
@@ -116,8 +90,8 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 			self.changeDir.clicked.connect(self.setupListener)
 		
 		try:
-			yield self.dv.signal__new_dataset(00001)
-			yield self.dv.addListener(listener=self.open_dataset, source=None, ID=00001)
+			yield self.dv.signal__new_dataset(0o0001)
+			yield self.dv.addListener(listener=self.open_dataset, source=None, ID=0o0001)
 			yield self.dv.cd(self.listenTo)
 			self.plotLive.setEnabled(True)
 			self.listen.setText('Listening!')
@@ -138,30 +112,15 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 			style = regStr + " " + pressStr
 			self.changeDir.setStyleSheet(style)
 		except:
-			print 'Either no LabRad connection or DataVault connection.'
+			print('Either no LabRad connection or DataVault connection.')
 
 	@inlineCallbacks
 	def update(self, c):
 		yield self.sleep(0.5)
 		
-	def renumPlotDicts(self, dim):
-		if dim == 1:
-			ii = 0
-			for plt in self.existing1DPlotDict:
-				windowName = '1DPlot_' + str(ii)
-				self.existing1DPlotDict[windowName] = self.existing1DPlotDict[plt]
-				ii += 1
-		elif dim == 2:
-			ii = 0
-			for plt in self.existing2DPlotDict:
-				windowName = '2DPlot_' + str(ii)
-				self.existing2DPlotDict[windowName] = self.existing2DPlotDict[plt]
-				ii += 1
-			
-		
 	@inlineCallbacks
 	def open_dataset(self, c, signal):
-		print 'signal: ', signal
+		print('signal: ', signal)
 		self.listenPlotFile =  signal
 		yield self.dv.open(str(self.listenPlotFile))
 		yield self.sleep(0.5)
@@ -169,66 +128,69 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		vars = yield self.dv.variables()
 		if params != None:
 			params = dict((x,y) for x,y in params)	
-			parKeys = params.keys()
+			parKeys = list(params.keys())
 			if 'live_plots' in parKeys:
+				print('init live plots')
 				self.initLivePlotting(params, vars)
 			else:
 				pass
 		else:
 			pass
+			'''
+			self.setupListenPlot = plotSetup(self.reactor, signal, self.listenTo, self.cxn, self.dv, 0, self)
+			self.setupListenPlot.show()
+			'''
 			
 	@inlineCallbacks
 	def initLivePlotting(self, params, vars, c = None):
+		print('Live Plots: ', params['live_plots'])
 		plot1DDict, plot2DDict = {}, {}
 		missingInfo = False
 		toPlot = params['live_plots']
+		print('To Plot: ', toPlot)
 		indVars, depVars = [x[0] for x in vars[0]], [x[0] for x in vars[1]]
+		print('Varialbes: ', vars)
 		for plot in toPlot:
 			if len(plot) == 2:
+				print(plot)
 				try:
 					title = str(plot[1]) + ' vs. ' + str(plot[0])
 					x_axis, y_axis = str(plot[0]), str(plot[1])
-					if (x_axis in indVars): 
-						x_index, y_index = indVars.index(x_axis), depVars.index(y_axis)+len(indVars)
-					else:
-						x_index, y_index = depVars.index(x_axis)+len(indVars), depVars.index(y_axis)+len(indVars)
+					x_index, y_index = indVars.index(x_axis), depVars.index(y_axis)+len(indVars)
 					x_rng = params[x_axis + '_rng']
 					x_pnts = params[x_axis + '_pnts']
 					plot1DDict[title] = {'title' : title, 'x axis' : x_axis, 'y axis' : y_axis, 'x index' : x_index, 'y index' : y_index, 'x range' : x_rng, 'x points' : x_pnts}
-					
 				except:
-					print 'Missing info on plot: ', plot
 					missingInfo = True
 			elif len(plot) == 3:
 				try:
 					title = str(plot[2]) + ' vs. ' + str(plot[0]) + ' and ' + str(plot[1])
 					x_axis, y_axis, z_axis = str(plot[0]), str(plot[1]), str(plot[2])
-					if (x_axis in indVars): 
-						x_index = indVars.index(x_axis)
-					else:
-						x_index = depVars.index(x_axis)+len(indVars)
-					if (y_axis in indVars): 
-						y_index = indVars.index(y_axis)
-					else:
-						y_index = depVars.index(y_axis)+len(indVars)
-					z_index = depVars.index(z_axis)+len(indVars)
+					x_index, y_index, z_index = indVars.index(x_axis), indVars.index(y_axis), depVars.index(z_axis)+len(indVars)
 					x_rng = params[x_axis + '_rng']
 					x_pnts = params[x_axis + '_pnts']
 					y_rng = params[y_axis + '_rng']
 					y_pnts = params[y_axis + '_pnts']
 					plot2DDict[title] = {'title' : title, 'x axis' : x_axis, 'y axis' : y_axis, 'z axis' : z_axis, 'x index' : x_index, 'y index' : y_index, 'z index' : z_index , 'x range' : x_rng, 'x points' : x_pnts, 'y range' : y_rng, 'y points' : y_pnts}
+					print(title)
 				except:
-					print 'Missing info on plot: ', plot
 					missingInfo = True
 			else:
 				pass
+		print('1D Plots: ', plot1DDict)
+		print('2D Plots: ', plot2DDict)
 		if missingInfo == False:
+			print('Starting Auto-Plots...')
 			yield self.openLivePlots(plot2DDict, plot1DDict, 0, self.reactor)
 			yield self.sleep(0.5)
 
 		else:
-			print 'Missing plot info...'
-
+			pass
+			'''
+			print '-------------------- Auto-start plots format is incorrect --------------------'
+			self.setupListenPlot = plotSetup(self.reactor, self.listenPlotFile, self.listenTo, self.cxn, self.dv, 0, self)
+			self.setupListenPlot.show()
+			'''
 	
 	def update_params(self):
 		pass
@@ -240,95 +202,24 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		
 	@inlineCallbacks
 	def openLivePlots(self, twoPlots, onePlots, fresh, c = None):
-		if fresh == 0:
-			i1, i2 = 0, 0
-			#close extra plot windows
-			try:
-				if len(twoPlots) < len(self.existing2DPlotDict):
-					for jj in range(len(twoPlots), len(self.existing2DPlotDict)):
-						windowName = '2DPlot_' + str(jj)
-						windowObj = getattr(self, windowName)
-						windowObj.cxn.disconnect()
-						windowObj.close()
-
-				if len(onePlots) < len(self.existing1DPlotDict):
-					for jj in range(len(onePlots), len(self.existing1DPlotDict)):
-						windowName = '1DPlot_' + str(jj)
-						windowObj = getattr(self, windowName)
-						windowObj.cxn.disconnect()
-						windowObj.close()
-
-			except Exception as inst:
-				print 'Following error was thrown: '
-				print inst
-				print 'Error thrown on line: '
-				print sys.exc_traceback.tb_lineno
-			plt1, plt2 = len(self.existing1DPlotDict), len(self.existing2DPlotDict)
-			
-			try: 
-				x0, y0 = 450, 25
-				for plot in twoPlots:
-					new2DPlotName = '2DPlot_' + str(i2)						
-					if i2 < plt2:			
-						windowObj = getattr(self, new2DPlotName)
-						windowObj.restartPlotting(twoPlots[plot], self.listenTo, self.listenPlotFile)
-					else:
-						setattr(self, new2DPlotName, plot2DWindow(self.reactor, twoPlots[plot], self.listenTo, self.listenPlotFile, x0, y0, fresh, new2DPlotName, self))
-						windowObj = getattr(self, new2DPlotName)
-						windowObj.show()
-						self.existing2DPlotDict[new2DPlotName] = windowObj
-						yield self.sleep(1)
-						y0 += 50
-					i2 += 1
-					yield self.sleep(1)
-				x0, y0 = 1250, 25
-				for plot in onePlots:
-					new1DPlotName = '1DPlot_' + str(i1)	
-					if i1 < plt1:
-						windowObj = getattr(self, new1DPlotName)
-						windowObj.restartPlotting(onePlots[plot], self.listenTo, self.listenPlotFile)
-					else:
-						setattr(self, new1DPlotName, plot1DWindow(self.reactor, onePlots[plot], self.listenTo, self.listenPlotFile, x0, y0, fresh, new1DPlotName, self))
-						windowObj = getattr(self, new1DPlotName)
-						windowObj.show()
-						self.existing1DPlotDict[new1DPlotName] = windowObj
-						yield self.sleep(1)
-						y0 += 50						
-					i1 += 1
-					yield self.sleep(1)
-			except Exception as inst:
-				print 'Following error was thrown: '
-				print inst
-				print 'Error thrown on line: '
-				print sys.exc_traceback.tb_lineno
-		elif fresh == 1:
-			try: 
-				x0, y0 = 450, 25
-				for plot in twoPlots:
-					num2Plots = len(self.existing2DPlotDict)
-					new2DPlotName = '2DPlot_' + str(num2Plots)	
-					setattr(self, new2DPlotName,  plot2DWindow(self.reactor, twoPlots[plot], self.listenTo, self.listenPlotFile, x0, y0, fresh, new2DPlotName, self))
-					windowObj = getattr(self, new2DPlotName)
-					windowObj.show()
-					self.existing2DPlotDict[new2DPlotName] = windowObj
-					yield self.sleep(1)
-					y0 += 50
-				x0, y0 = 1250, 25
-				for plot in onePlots:
-					num1Plots = len(self.existing1DPlotDict)
-					new1DPlotName = '1DPlot_' + str(num2Plots)	
-					setattr(self, new1DPlotName, plot1DWindow(self.reactor, onePlots[plot], self.listenTo, self.listenPlotFile, x0, y0, fresh, new1DPlotName, self))
-					windowObj = getattr(self, new1DPlotName)
-					windowObj.show()
-					self.existing1DPlotDict[new1DPlotName] = windowObj
-					yield self.sleep(1)
-					y0 += 50
-			except Exception as inst:
-				print 'Following error was thrown: '
-				print inst
-				print 'Error thrown on line: '
-				print sys.exc_traceback.tb_lineno
-		
+		try: 
+			x0, y0 = 450, 25
+			for plot in twoPlots:
+				self.new2DPlot = plot2DWindow(self.reactor, twoPlots[plot], self.listenTo, self.listenPlotFile, x0, y0, fresh, self)
+				self.new2DPlot.show()
+				yield self.sleep(1)
+				y0 += 50
+			x0, y0 = 1250, 25
+			for plot in onePlots:
+				self.new1DPlot = plot1DWindow(self.reactor, onePlots[plot], self.listenTo, self.listenPlotFile, x0, y0, fresh, self)
+				self.new1DPlot.show()
+				yield self.sleep(1)
+				y0 += 50
+		except Exception as inst:
+			print('Following error was thrown: ')
+			print(inst)
+			print('Error thrown on line: ')
+			print(sys.exc_traceback.tb_lineno)
 		self.allowPlot = True
 			
 	def openSavedPlots(self, file, dir, allPlots, dim):
@@ -342,26 +233,28 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 					self.savePlotList.append(thing)
 					y0 += 50
 				except Exception as inst:
-					print 'Following error was thrown: '
-					print inst
-					print 'Error thrown on line: '
-					print sys.exc_traceback.tb_lineno 
+					print('Following error was thrown: ')
+					print(inst)
+					print('Error thrown on line: ')
+					print(sys.exc_traceback.tb_lineno) 
 		elif dim == 1:
 			for plot in allPlots:
 				try:
+					print('opening 1D plot', plot)
 					thing = plotSaved1DWindow(self.reactor, file, dir, allPlots[plot], y0, color0)
 					thing.show()
 					self.savePlotList.append(thing)
 					y0 += 50
 					color0 += 1
 				except Exception as inst:
-					print 'Following error was thrown: '
-					print inst
-					print 'Error thrown on line: '
-					print sys.exc_traceback.tb_lineno						
+					print('Following error was thrown: ')
+					print(inst)
+					print('Error thrown on line: ')
+					print(sys.exc_traceback.tb_lineno) 						
 
 	def plotLiveData(self):
 		self.dvExplorer = dataVaultExplorer(self.reactor, 'live', self.listenTo, self)
+		print('opening liver')
 		self.dvExplorer.show()
 		
 	def setupListener(self):
@@ -371,6 +264,9 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		drcExplorer.show()
 		
 	def plotSavedDataFunc(self):
+		print('hi there')
+		#self.pltSaved = plotSavedWindow()
+		#self.pltSaved.show()
 		self.dvExplorer = dataVaultExplorer(self.reactor, 'saved', self.listenTo, self)
 		self.dvExplorer.show()
 		
@@ -387,7 +283,7 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 	def closeEvent(self, e):
 		self.reactor.stop()
 		self.cxn.disconnect()
-		print 'Reactor shut down.'
+		print('Reactor shut down.')
 		
 	def sleep(self, secs):
 		"""Asynchronous compatible sleep command. Sleeps for given time in seconds, but allows
@@ -405,9 +301,6 @@ class extentPrompt(QtGui.QDialog, Ui_ExtPrompt):
 		self.plotInfo = plotInfo
 		self.mainWin = parent
 		self.setupUi(self)
-		icon = QtGui.QIcon()
-		icon.addPixmap(QtGui.QPixmap(guiIconPath))
-		self.setWindowIcon(icon)
 		
 		self.x0, self.y0 = x0, y0
 		self.moveDefault()
@@ -494,6 +387,7 @@ class extentPrompt(QtGui.QDialog, Ui_ExtPrompt):
 			self.mainWin.pxsize = pxsize
 			self.accept()
 		else:
+			print(errCell)
 			for ii in range(0, len(errCell)):
 				self.extTable.item(errCell[ii][0], errCell[ii][1]).setBackgroundColor(QtGui.QColor(250,190,160))
 				
@@ -501,446 +395,148 @@ class extentPrompt(QtGui.QDialog, Ui_ExtPrompt):
 		self.reject()
 
 class plot2DWindow(QtGui.QDialog):
-	def __init__(self, reactor, plotInfo, dir, file, x0, y0, fresh, windowID, parent = None):
-		super(plot2DWindow, self).__init__(parent)
-		self.plotInfo = plotInfo
-		self.reactor = reactor
-		self.plotWinID = windowID
-		self.mainWin = parent
-		self.pX, self.pY = x0, y0
+	def __init__(self, reactor, plotInfo, dir, file, x0, y0, fresh, parent = None):
+		try: 
+			super(plot2DWindow, self).__init__(parent)
+			self.plotInfo = plotInfo
+			self.reactor = reactor
+			self.mainWin = parent
+			self.dir = dir
+			self.fileName = file
+			#fresh specifies if the dataset to be plotted already has data (1) or is empty (0)
+			self.fresh = fresh
 			
-		self.dir = dir
-		self.fileName = file
-		self.resize(850,763)
-		self.move(self.pX,self.pY)
-		#fresh specifies if the dataset to be plotted already has data (1) or is empty (0)
-		self.fresh = fresh
-		self.connect(QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL+ QtCore.Qt.Key_C), self), QtCore.SIGNAL('activated()'),self.copyPlotToClip)
-		self.autoLevelMainplot = True
-		self.cxnName = None
-		self.definePlotParams()
-	
-	def definePlotParams(self, state = None):
-		self.xIndex = self.plotInfo['x index']
-		self.yIndex = self.plotInfo['y index']
-		self.zIndex = self.plotInfo['z index']
-		
-		self.extents = [self.plotInfo['x range'][0], self.plotInfo['x range'][1], self.plotInfo['y range'][0], self.plotInfo['y range'][1]]
-		self.pxsize = [self.plotInfo['x points'], self.plotInfo['y points']]
-		self.plotTitle = self.plotInfo['title']
-		if self.plotTitle[0:5] == 'Plot ':
-			self.plotTitle = str(self.fileName) + ': ' + self.plotInfo['z axis'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis']
+			self.xIndex = self.plotInfo['x index']
+			self.yIndex = self.plotInfo['y index']
+			self.zIndex = self.plotInfo['z index']
+			
+			print('------------------------------')
+			print('Plot parameters: ')
+			print(file)
+			print(plotInfo)
+			print(fresh)
+			print(dir)
 
-		else:
-			self.plotTitle = str(self.fileName) + ': ' + self.plotTitle
-		self.setWindowTitle(self.plotTitle)
-		self.Data = np.array([])
-		
-		self.setupPlot(state)
-		self.setupListener(self.reactor)
-		self.isData = False	
-		
-	def restartPlotting(self, newPlotInfo, listenDir, listenFile):
-		self.plotInfo = newPlotInfo
-		self.dir = listenDir
-		self.fileName = listenFile	
-		self.definePlotParams(0)
-						
-	def copyPlotToClip(self):
-		r = self.mainPlot.ui.histogram.region.getRegion()
-		self.mainPlot.ui.histogram.vb.setYRange(*r)
-		#create ImageExpoerters:
-		mainExp = pg.exporters.ImageExporter(self.viewBig)
-		colorAxisExp = pg.exporters.ImageExporter(self.mainPlot.ui.histogram.axis)
-		colorBarExp = pg.exporters.ImageExporter(self.mainPlot.ui.histogram.gradient)
-		#create QImages:
-		main =mainExp.export(toBytes=True)
-		colorAxis =colorAxisExp.export(toBytes=True)
-		colorBar = colorBarExp.export(toBytes=True)
-		#define teh size:
-		x = main.width() + colorAxis.width() + colorBar.width()
-		y = main.height()
-		#to get everything in the same height:
-		yOffs = [0,0.5*(y-colorAxis.height()),0.5*(y-colorBar.height())]
-		result = QtGui.QImage(x, y ,QtGui.QImage.Format_RGB32)
-		painter = QtGui.QPainter(result)
-		posX = 0
-		for img,y in zip((main,colorAxis,colorBar),yOffs):
-				#draw every part in different positions:
-				painter.drawImage(posX, y, img)
-				posX += img.width()
-		painter.end()
-		#save to file
-		QApplication.clipboard().setImage(result)
+			self.pX, self.pY = x0, y0
+			self.extents = [self.plotInfo['x range'][0], self.plotInfo['x range'][1], self.plotInfo['y range'][0], self.plotInfo['y range'][1]]
+			self.pxsize = [self.plotInfo['x points'], self.plotInfo['y points']]
+			self.plotTitle = self.plotInfo['title']
+			if self.plotTitle[0:5] == 'Plot ':
+				self.plotTitle = self.plotInfo['z axis'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis']		
+			self.setWindowTitle(self.plotTitle)
+
+			self.Data = np.array([])
+			
+			self.setupPlot()
+			self.setupListener(self.reactor)
+			self.isData = False
+			
+			
+		except Exception as inst:
+			print('Following error was thrown: ')
+			print(inst)
+			print('Error thrown on line: ')
+			print(sys.exc_traceback.tb_lineno) 
 		
 	@inlineCallbacks
 	def setupListener(self, c):
 		try: 
-			if self.cxnName == None:
-				self.cxnName = 'plot' + str(self.id)
-				from labrad.wrappers import connectAsync
-				self.cxn = yield connectAsync(name = self.cxnName)
-				self.dv = yield self.cxn.data_vault
+			cxnName = 'plot' + str(self.id)
+			from labrad.wrappers import connectAsync
+			self.cxn = yield connectAsync(name = cxnName)
+			self.dv = yield self.cxn.data_vault
 			yield self.dv.cd(self.dir)
 			yield self.dv.open(self.fileName)
+
 			yield self.addListen(self.reactor)
 			newData = yield self.dv.get()
+			print('New Data: ', newData[0])
+			print('Length: ', len(newData))
 
-			if len(newData) == 0 or len(newData[0]) == 0:
-				pass
-			else:
+			if len(newData[0]) != 0:
 				inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex])
 				newData = np.delete(np.asarray(newData), inx, axis = 1)
 				x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.xIndex)[0][0]
 				y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.yIndex)[0][0]
 				z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.zIndex)[0][0]
 				newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
+				print(newData[::, x_ind])
 				newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
+
 
 				for pt in newData:
 					self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]
-
-				r0 = np.where(np.all(self.plotData == self.randFill, axis = 0))[0]
-				c0 = np.where(np.all(self.plotData == self.randFill, axis = 1))[0]
-				self.tmp = np.delete(np.delete(self.plotData, r0, axis = 1), c0, axis = 0)
-				argX = np.min([self.extents[0],self.extents[1]]) + self.xscale * np.max(np.append(c0, -1) + 1)
-				argY = np.min([self.extents[2],self.extents[3]]) + self.yscale * np.max(np.append(r0, -1) + 1)
-				self.mainPlot.setImage(self.tmp, autoRange = False ,	 autoLevels = False, pos=[argX, argY],scale=[self.xscale, self.yscale])
-				if self.autoLevelMainplot:
-					self.mainPlot.autoLevels()
-
-
+				
+				self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 				self.isData = True
+
 			
 		except Exception as inst:
-			print 'Following error was thrown: '
-			print inst
-			print 'Error thrown on line: '
-			print sys.exc_traceback.tb_lineno 
+			print('Following error was thrown: ')
+			print(inst)
+			print('Error thrown on line: ')
+			print(sys.exc_traceback.tb_lineno) 
 	@inlineCallbacks
 	def addListen(self, c):
 		yield self.dv.signal__data_available(self.id)
 		yield self.dv.addListener(listener=self.updatePlot, ID=self.id)
+		print('2D listener added with ID: ' + str(self.id))
+
+
 		
-	def setupPlot(self, state = None):
+	def setupPlot(self):
 		global ID_NEWDATA
+		print('setting up plot............', ID_NEWDATA)
 		self.id = ID_NEWDATA
 		ID_NEWDATA = ID_NEWDATA + 1
-
-		if state is None:
+		try: 
+			self.resize(700,550)
+			self.move(self.pX,self.pY)
 			p = self.palette()
 			p.setColor(self.backgroundRole(), QtGui.QColor(0, 0, 0))
 			self.setPalette(p)
-			
-			self.noCutWidget = QtGui.QWidget()
-			self.vCutWidget = QtGui.QWidget()
-			self.hCutWidget = QtGui.QWidget()
-			self.vhCutWidget = QtGui.QWidget()
-		self.defPlots(state)
 		
-		if state is None:
-			self.layoutList = [self.layout, self.vLayout, self.hLayout, self.vhLayout]
-			self.stackLayout = QtGui.QStackedWidget(self)
+			self.layout = QtGui.QGridLayout(self)
 			
-			self.plotTitleLbl = QtGui.QLabel()
-			self.selectLbl = QtGui.QLabel()
-			self.posLbl = QtGui.QLabel()
-			self.autoHistChk = QtGui.QCheckBox()
-			self.autoHistLbl = QtGui.QLabel()
-			self.lineCutBox = QtGui.QComboBox()
-			self.posBox = QtGui.QDoubleSpinBox()
-			
-			self.autoHistChk.setCheckState(2)
-			self.autoHistChk.stateChanged.connect(self.autoHistFunc)
-
-			
-			self.plotTitleLbl.setText(self.plotTitle)
-			self.plotTitleLbl.setObjectName('plotTitleLbl')
-			self.plotTitleLbl.setStyleSheet("QLabel#plotTitleLbl {background-color: 'black'; color: rgb(131,131,131); font: 11pt;}")
-
-			self.autoHistLbl.setText('Autorange Histogram')
-			self.autoHistLbl.setObjectName('autoHistLbl')
-			self.autoHistLbl.setStyleSheet("QLabel#autoHistLbl {background-color: 'black'; color: rgb(131,131,131); font: 9pt;}")			
-			
-			self.selectLbl.setText('Select Line Cut')
-			self.selectLbl.setObjectName('selectLbl')
-			self.selectLbl.setStyleSheet("QLabel#selectLbl {background-color: 'black'; color: rgb(131,131,131); font: 9pt;}")
-			
-			self.lineCutBox.setObjectName('lineCutBox')
-			self.lineCutBox.setStyleSheet("QComboBox#lineCutBox{width: 20px; color: rgb(131,131,131); background-color: 'balck';	border: 2px solid rgb(131,131,131); border-radius: 5px;}")
-			self.lineCutBox.insertItem(0, 'None')
-			self.lineCutBox.insertItem(1, 'Vertical')
-			self.lineCutBox.insertItem(2, 'Horizontal')
-			self.lineCutBox.insertItem(3, 'Both')
-
-			self.lineCutBox.currentIndexChanged.connect(self.setIndex)
-			self.lineCutBox.setMinimumWidth(85)
-		
-			self.stackLayout.addWidget(self.noCutWidget)
-			self.stackLayout.addWidget(self.vCutWidget)
-			self.stackLayout.addWidget(self.hCutWidget)
-			self.stackLayout.addWidget(self.vhCutWidget)
-			
-			self.mainLayout = QtGui.QGridLayout(self)
-			self.mainLayout.addWidget(self.stackLayout, *(1,0, 1, 6))
-			self.mainLayout.addWidget(self.plotTitleLbl, *(0,0))
-			self.mainLayout.addWidget(self.autoHistLbl, *(0,2))
-			self.mainLayout.addWidget(self.autoHistChk, *(0,3), alignment = QtCore.Qt.AlignLeft)
-			self.mainLayout.addWidget(self.selectLbl, *(0,4), alignment = QtCore.Qt.AlignRight)
-			self.mainLayout.addWidget(self.lineCutBox, *(0,5), alignment = QtCore.Qt.AlignLeft)
-			self.setLayout(self.mainLayout)
-			self.startIndex = 0
-			self.stackLayout.setCurrentIndex(0)
-		else:
-			self.plotTitleLbl.setText(self.plotTitle)
-			self.plotTitleLbl.setStyleSheet("QLabel#plotTitleLbl {background-color: 'black'; color: rgb(131,131,131); font: 11pt;}")
-
-	
-	def autoHistFunc(self, state):
-		try:
-			
-			if state == 0:
-				self.autoLevelMainplot = False
-
-			elif state == 2:
-				self.autoLevelMainplot = True
-
-
-		except Exception as inst:
-			print 'Following error was thrown: '
-			print inst
-			print 'Error thrown on line: '
-			print sys.exc_traceback.tb_lineno 
-	
-	def toggleTraceFunc(self):
-		jj = self.i % 2
-		self.stackLayout.setCurrentIndex(jj)
-		if jj % 2 == 0:
-			self.layout2.removeWidget(self.mainPlot)
-			self.layout1.addWidget(self.mainPlot, *(0,0))
-		else:
-			self.layout1.removeWidget(self.mainPlot)
-			self.layout2.addWidget(self.mainPlot, *(0,0))
-		self.i += 1
-	
-	def testHist(self, autoLevel=False, autoRange=False):
-		histTmp = self.tmp - self.randFill
-		w = np.absolute(np.divide(histTmp, histTmp, out = np.zeros_like(histTmp), where = histTmp != 0))
-		step = (int(np.ceil(w.shape[0] / 200)),
-					int(np.ceil(w.shape[1] / 200)))
-		if np.isscalar(step):
-			step = (step, step)
-		stepW = w[::step[0], ::step[1]]
-		stepW = stepW[np.isfinite(stepW)]
-		h = self.mainImage.getHistogram(weights = stepW)
-		if h[0] is None:
-			return
-		self.mainPlot.ui.histogram.plot.setData(*h)
-		if autoLevel:
-			mn = h[0][0]
-			mx = h[0][-1]
-			self.mainPlot.ui.histogram.region.setRegion([mn, mx])
-
-	
-	def defPlots(self, state = None):
-		if state is None:
-			self.vTraceLine = pg.InfiniteLine(pos = self.extents[0], angle = 90, movable = True)
-			self.hTraceLine = pg.InfiniteLine(pos = self.extents[2], angle = 0, movable = True)
-			self.vTraceLine.sigPositionChangeFinished.connect(self.updateVCutPlot)
-			self.hTraceLine.sigPositionChangeFinished.connect(self.updateHCutPlot)
-			self.viewBig = pg.PlotItem(name = "Plot")
+			self.viewBig = pg.PlotItem(name = "Plot", title = self.plotTitle)
 			self.viewBig.showAxis('top', show = True)
 			self.viewBig.showAxis('right', show = True)
 			self.viewBig.setLabel('left', self.plotInfo['y axis'])
 			self.viewBig.setLabel('bottom', self.plotInfo['x axis'])
 			self.viewBig.setAspectLocked(lock = False, ratio = 1)
-			self.mainImage = pg.ImageItem()
-			self.mainPlot = pg.ImageView(view = self.viewBig, imageItem = self.mainImage)
-			self.mainImage.sigImageChanged.connect(self.testHist)
+			self.mainPlot = pg.ImageView(view = self.viewBig)
 			self.mainPlot.ui.menuBtn.hide()
 			self.mainPlot.ui.histogram.item.gradient.loadPreset('bipolar')
 			self.mainPlot.ui.roiBtn.hide()
 			self.mainPlot.ui.menuBtn.hide()
-			self.viewBig.setXRange(np.min([self.extents[0],self.extents[1]]), np.max([self.extents[0],self.extents[1]]))
-			self.viewBig.setYRange(np.min([self.extents[2],self.extents[3]]), np.max([self.extents[2],self.extents[3]]))
 			self.viewBig.setAspectLocked(False)
 			self.viewBig.invertY(False)
-		else:
-			self.mainPlot.clear()
-			self.viewBig.removeItem(self.rect)
-	
-		self.randFill = np.random.random() * 1e-3
-		self.plotData = np.full([self.pxsize[0], self.pxsize[1]], self.randFill)
-		self.rect = QtGui.QGraphicsRectItem(np.min([self.extents[0], self.extents[1]]), np.min([self.extents[2], self.extents[3]]), np.absolute(self.extents[1] - self.extents[0]), np.absolute(self.extents[3] - self.extents[2]))
-		self.rect.setBrush(QtGui.QColor('transparent'))
-		self.viewBig.addItem(self.rect)
-		
-		self.xscale, self.yscale = np.absolute((self.extents[1] - self.extents[0])/self.pxsize[0]), np.absolute((self.extents[3] - self.extents[2])/self.pxsize[1])
-		
-		if self.extents[0] < self.extents[1]:
-			self.xBins = np.linspace(self.extents[0] - 0.5 * self.xscale, self.extents[1] + 0.5 * self.xscale, self.pxsize[0]+1)
-		else:
-			self.xBins = np.linspace(self.extents[1] - 0.5 * self.xscale, self.extents[0] + 0.5 * self.xscale, self.pxsize[0]+1)
-		
-		if self.extents[2] < self.extents[3]:
-			self.yBins = np.linspace(self.extents[2] - 0.5 * self.yscale, self.extents[3] + 0.5 * self.yscale, self.pxsize[1]+1)
-		else:
-			self.yBins = np.linspace(self.extents[3] - 0.5 * self.yscale, self.extents[2] + 0.5 * self.yscale, self.pxsize[1]+1)
-		
+			self.viewBig.setXRange(-1, 1)
+			self.viewBig.setYRange(-1, 1)
 
-		
-		if state is None:
-			self.plot1DV = pg.PlotWidget()
-			self.plot1DV.showAxis('right', show = True)
-			self.plot1DV.showAxis('top', show = True)
+			self.layout.addWidget(self.mainPlot, *(0,0))
+			self.setLayout(self.layout)
 			
-			self.plot1DH = pg.PlotWidget()
-			self.plot1DH.showAxis('right', show = True)
-			self.plot1DH.showAxis('top', show = True)	
-		else:
-			self.plot1DH.clear()
-			self.plot1DV.clear()
+			self.plotData = np.zeros([self.pxsize[0], self.pxsize[1]])
+			
+			self.xscale, self.yscale = np.absolute((self.extents[1] - self.extents[0])/self.pxsize[0]), np.absolute((self.extents[3] - self.extents[2])/self.pxsize[1])
+			self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+			
+			if self.extents[0] < self.extents[1]:
+				self.xBins = np.linspace(self.extents[0] - 0.5 * self.xscale, self.extents[1] + 0.5 * self.xscale, self.pxsize[0]+1)
+			else:
+				self.xBins = np.linspace(self.extents[1] - 0.5 * self.xscale, self.extents[0] + 0.5 * self.xscale, self.pxsize[0]+1)
+			
+			if self.extents[2] < self.extents[3]:
+				self.yBins = np.linspace(self.extents[2] - 0.5 * self.yscale, self.extents[3] + 0.5 * self.yscale, self.pxsize[1]+1)
+			else:
+				self.yBins = np.linspace(self.extents[3] - 0.5 * self.yscale, self.extents[2] + 0.5 * self.yscale, self.pxsize[1]+1)
 		
-		
-		self.plot1DV.setLabel('left', self.plotInfo['y axis'])
-		self.plot1DV.setLabel('bottom', self.plotInfo['z axis'])	
-
-
-		self.plot1DH.setLabel('left', self.plotInfo['z axis'])
-		self.plot1DH.setLabel('bottom', self.plotInfo['x axis'])	
-		
-		if state is None:
-			self.setVHCutWidget()
-			self.setHCutWidget()
-			self.setVCutWidget()	
-			self.setNoCutWidget()
-		
-	def updateHCutPlot(self):
-		pos = self.hTraceLine.value()
-		index = np.absolute(int(self.pxsize[1] * (pos - np.min([self.extents[2], self.extents[3]]))/(self.extents[3] - self.extents[2])))
-		self.plot1DH.clear()
-		if pos < np.max([self.extents[2], self.extents[3]]) and pos > np.min([self.extents[2], self.extents[3]]): 
-			xVals = np.linspace(np.min([self.extents[0], self.extents[1]]), np.max([self.extents[0], self.extents[1]]), self.pxsize[0])
-			yVals = self.plotData[::, index]
-			self.plot1DH.plot(x = xVals, y = yVals, pen = 0.5)
-		
-		
-	def updateVCutPlot(self):
-		pos = self.vTraceLine.value()
-		index = np.absolute(int(self.pxsize[0] * (pos - np.min([self.extents[0], self.extents[1]]))/(self.extents[1] - self.extents[0])))
-		self.plot1DV.clear()
-		if pos < np.max([self.extents[0], self.extents[1]]) and pos > np.min([self.extents[0], self.extents[1]]): 
-			yVals = np.linspace(np.min([self.extents[2], self.extents[3]]), np.max([self.extents[2], self.extents[3]]), self.pxsize[1])
-			xVals = self.plotData[index, ::]
-			self.plot1DV.plot(x = xVals, y = yVals, pen = 0.5)
-	
-	def setNoCutWidget(self):
-		self.layout = QtGui.QGridLayout()
-		self.layout.addWidget(self.mainPlot, *(0,0))
-		self.noCutWidget.setLayout(self.layout)
-		
-		
-	def setVCutWidget(self):
-		self.vLayout = QtGui.QGridLayout()
-		self.vLayout.addWidget(self.plot1DV, *(0, 0, 1, 1), alignment = QtCore.Qt.AlignVCenter)
-		self.vLayout.addWidget(self.mainPlot,*(0, 1, 1, 1))
-		self.vLayout.setColumnStretch(0,2)
-		self.vLayout.setColumnStretch(1,5)
-		self.vCutWidget.setLayout(self.vLayout)
-		
-	def setHCutWidget(self):
-		self.hLayout = QtGui.QGridLayout()
-		self.hLayout.addWidget(self.plot1DH, *(1, 0, 1, 7))
-		self.hLayout.addWidget(self.mainPlot,*(0, 0, 1, 8))
-		self.hLayout.setRowStretch(0,5)
-		self.hLayout.setRowStretch(1,2)
-		self.hCutWidget.setLayout(self.hLayout)
-		
-	def setVHCutWidget(self):
-		self.vhLayout = QtGui.QGridLayout()
-		self.vhLayout.addWidget(self.plot1DH, *(1, 1, 1, 1))
-		self.vhLayout.addWidget(self.plot1DV, *(0, 0, 1, 1))
-		self.vhLayout.addWidget(self.mainPlot,*(0, 1, 1, 2))
-		self.vhLayout.setRowStretch(0,5)
-		self.vhLayout.setRowStretch(1,2)
-		self.vhLayout.setColumnStretch(0,6)
-		self.vhLayout.setColumnStretch(1,14)
-		self.vhLayout.setColumnStretch(2,2)
-		self.vhCutWidget.setLayout(self.vhLayout)
-		
-		self.mainPlotPosList = [(0,0), (0,1, 1, 1), (0,0, 1, 8), (0,1,1,2)]
-
-	def setIndex(self, jj):
-		self.layoutList[self.startIndex].removeWidget(self.mainPlot)
-		startHeight = self.height()
-		startWidth = self.width()
-		xPos, yPos =  self.x(), self.y()
-		plotH, plotW = self.viewBig.height(), self.viewBig.width()
-		if self.startIndex == 1:
-			self.vLayout.removeWidget(self.plot1DV)
-		elif self.startIndex == 2:
-			self.hLayout.removeWidget(self.plot1DH)
-		elif self.startIndex == 3:
-			self.vhLayout.removeWidget(self.plot1DV)
-			self.vhLayout.removeWidget(self.plot1DH)
-		if jj == 1:
-			self.vLayout.addWidget(self.plot1DV, *(0, 0, 1, 1))
-
-			if self.startIndex == 0:
-				self.viewBig.addItem(self.vTraceLine, ignoreBounds = True)
-				self.resize(int(1.386 * startWidth), int(startHeight))
-				
-			elif self.startIndex == 2:
-				self.viewBig.removeItem(self.hTraceLine)
-				self.viewBig.addItem(self.vTraceLine, ignoreBounds = True)
-				self.resize(int(1.385099* startWidth), int(0.730246*startHeight))
-			elif self.startIndex == 3:
-				self.viewBig.removeItem(self.hTraceLine)
-				self.resize(int(1.0203 * startWidth), int(0.73105 * startWidth))		
-
-		elif jj == 2:
-			self.hLayout.addWidget(self.plot1DH, *(1, 0, 1, 7))
-			if self.startIndex == 0:
-				self.viewBig.addItem(self.hTraceLine, ignoreBounds = True)
-				
-				self.resize(startWidth, int(1.37776 * startHeight))
-			elif self.startIndex == 1:
-				self.viewBig.addItem(self.hTraceLine, ignoreBounds = True)
-				self.viewBig.removeItem(self.vTraceLine)
-				self.resize(int(0.72197*startWidth), int(1.3694*startHeight))
-			elif self.startIndex == 3:
-				self.viewBig.removeItem(self.vTraceLine)
-				self.resize(int(0.73128 * startWidth), int(startHeight))		
-		elif jj == 3:
-			self.vhLayout.addWidget(self.plot1DV, *(0, 0, 1, 1))
-			self.vhLayout.addWidget(self.plot1DH, *(1, 1, 1, 1))
-			if self.startIndex == 0:
-				self.viewBig.addItem(self.hTraceLine, ignoreBounds = True)
-				self.viewBig.addItem(self.vTraceLine, ignoreBounds = True)
-				self.resize(int(1.3498 *startWidth), int(1.3533*startHeight))
-			elif self.startIndex == 1:
-				self.viewBig.addItem(self.hTraceLine, ignoreBounds = True)
-				self.resize(int(0.9801*startWidth), int(1.3679*startHeight))
-			elif self.startIndex == 2:
-				self.viewBig.addItem(self.vTraceLine, ignoreBounds = True)
-				self.resize(int(1.36746*startWidth), int(startHeight))
-		elif jj == 0:
-			if self.startIndex == 1:
-				self.viewBig.removeItem(self.vTraceLine)
-				self.resize(int(0.7215*startWidth),int(startHeight))
-			elif self.startIndex == 2:
-				self.viewBig.removeItem(self.hTraceLine)
-				self.resize(int(startWidth), int(0.72582 * startHeight))
-			elif self.startIndex == 3:
-				self.viewBig.removeItem(self.vTraceLine)
-				self.viewBig.removeItem(self.hTraceLine)
-				self.resize(int(0.74085 * startWidth), int(0.7389 * startHeight))
-		self.layoutList[jj].addWidget(self.mainPlot, *self.mainPlotPosList[jj])
-		self.stackLayout.setCurrentIndex(jj)
-		self.startIndex = jj
-		
-
-		
+		except Exception as inst:
+			print('Following error was thrown: ')
+			print(inst)
+			print('Error thrown on line: ')
+			print(sys.exc_traceback.tb_lineno) 
 			
 	def sleep(self,secs):
 		d = Deferred()
@@ -966,10 +562,10 @@ class plot2DWindow(QtGui.QDialog):
 				newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins)-1
 				yield self.plotMore(newData, x_ind, y_ind, z_ind, self.reactor)
 		except Exception as inst:
-			print 'Following error was thrown: '
-			print inst
-			print 'Error thrown on line: '
-			print sys.exc_traceback.tb_lineno 
+			print('Following error was thrown: ')
+			print(inst)
+			print('Error thrown on line: ')
+			print(sys.exc_traceback.tb_lineno) 
 	@inlineCallbacks
 	def plotMore(self, newData, x_ind, y_ind, z_ind, c):
 		yield self.sleep(0.1)
@@ -977,26 +573,17 @@ class plot2DWindow(QtGui.QDialog):
 		for pt in newData:
 				self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]
 
-		r0 = np.where(np.all(self.plotData == self.randFill, axis = 0))[0]
-		c0 = np.where(np.all(self.plotData == self.randFill, axis = 1))[0]
-		self.tmp = np.delete(np.delete(self.plotData, r0, axis = 1), c0, axis = 0)
-		argX = np.min([self.extents[0],self.extents[1]]) + self.xscale * np.max(np.append(c0, -1) + 1)
-		argY = np.min([self.extents[2],self.extents[3]]) + self.yscale * np.max(np.append(r0, -1) + 1)
-		self.mainPlot.setImage(self.tmp, autoRange = False , autoLevels = False, pos=[argX, argY],scale=[self.xscale, self.yscale])
-		if self.autoLevelMainplot:
-			self.mainPlot.autoLevels()
-		pctComplete = int(100 * (self.tmp.shape[0] * self.tmp.shape[1]) / (self.plotData.shape[0] * self.plotData.shape[1]))
-		self.setWindowTitle(self.plotTitle + ' (' + str(pctComplete) + '% Complete)')
+		self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+
+		
 		
 
 	def closeEvent(self, e):
-		self.mainWin.existing2DPlotDict.pop(self.plotWinID)
-		self.mainWin.renumPlotDicts(2)
 		self.cxn.disconnect()
 		self.close()
 
 class plot1DWindow(QtGui.QDialog):
-	def __init__(self, reactor, plotInfo, dir, file, x0, y0, fresh, windowID, parent = None):
+	def __init__(self, reactor, plotInfo, dir, file, x0, y0, fresh, parent = None):
 		super(plot1DWindow, self).__init__(parent)
 
 		self.reactor = reactor
@@ -1004,27 +591,17 @@ class plot1DWindow(QtGui.QDialog):
 		self.dir = dir
 		self.fileName = file
 		self.plotInfo = plotInfo
-		self.plotWinID = windowID
 		self.fresh = fresh
-		self.cxnName = None
 		
 		self.pX, self.pY = x0, y0
-		self.resize(600,320)
-		self.move(self.pX,self.pY)
 		
-		self.definePlotParams()
-		
-		
-	def definePlotParams(self, state = None):
 		self.isData = False
 		self.traceCnt = 0
-		self.numLines = 0
+		self.numLines = 1
 		self.Data = np.array([])
 		self.plotTitle = self.plotInfo['title']
 		if self.plotTitle[0:5] == 'Plot ':
-			self.plotTitle = str(self.fileName) + ': ' + self.plotInfo['y axis'] + ' vs. ' + self.plotInfo['x axis']
-		else:
-			self.plotTitle = str(self.fileName) + ': ' + self.plotTitle
+			self.plotTitle = self.plotInfo['y axis'] + ' vs. ' + self.plotInfo['x axis']
 		self.setWindowTitle(self.plotTitle)
 		self.xIndex = self.plotInfo['x index']
 		self.yIndex = self.plotInfo['y index']
@@ -1032,123 +609,100 @@ class plot1DWindow(QtGui.QDialog):
 		self.extents = [self.plotInfo['x range'][0], self.plotInfo['x range'][1]]
 		self.pxsize = self.plotInfo['x points']
 		
-		self.setupPlot(state)
+		self.setupPlot()
 		self.setupListener(self.reactor)
 		
-	def restartPlotting(self, newPlotInfo, listenDir, listenFile):
-		print 'restarting plot.....................	 ', str(listenFile)
-		self.dir = listenDir
-		self.fileName = listenFile
-		self.plotInfo = newPlotInfo
-		print 'redefining plot parameters'
-		self.definePlotParams(0)
-		
-	def setupPlot(self, state = None):
+	def setupPlot(self):
 		global ID_NEWDATA
-		if state is None:
-			self.id = ID_NEWDATA
+		print('setting up plot............', ID_NEWDATA)
+		self.id = ID_NEWDATA
 		ID_NEWDATA = ID_NEWDATA + 1
 		
 		self.colorWheel = [(0,114,189), (216,83,25), (237,177,32), (126,47,142), (119,172,48)]
 		self.QColorWheel = [QtGui.QColor(0,114,189), QtGui.QColor(216,83,25), QtGui.QColor(237,177,32), QtGui.QColor(126,47,142), QtGui.QColor(119,172,48)]
 		self.penColor = self.colorWheel[int(self.id)%5]
+		self.resize(600,320)
+		self.move(self.pX,self.pY)
 		p = self.palette()
 		p.setColor(self.backgroundRole(), QtGui.QColor(0, 0, 0))
 		self.setPalette(p)
 	
 		self.layout = QtGui.QGridLayout(self)
-		if	state is None:
-			self.plot1D = pg.PlotWidget()
-			self.plot1D.showAxis('right', show = True)
-			self.plot1D.showAxis('top', show = True)
-			self.traceCntBox = QtGui.QComboBox()
-			self.traceCntBox.setObjectName('traceCntBox')
-			
-
-			self.currentTraceColor = str(self.colorWheel[int(self.id)%5])
-			self.traceCntStyle = "QComboBox#traceCntBox{width: 20px; color: rgb(131,131,131); background-color: 'balck';  border: 2px solid rgb(131,131,131); border-radius: 5px;  "
-			self.styleColorTxt = 'color: rgb'+self.currentTraceColor+';}'
-			self.traceCntBox.setStyleSheet(self.traceCntStyle+self.styleColorTxt)
-			self.traceCntBox.insertItem(0, '1')
-			self.traceCntBox.insertItem(1, '2')
-			self.traceCntBox.insertItem(2, '3')
-			self.traceCntBox.insertItem(3, '4')
-			self.traceCntBox.insertItem(4, '5')
-			self.traceCntBox.setItemData(0, self.QColorWheel[int(self.id)%5], QtCore.Qt.TextColorRole)
-			self.traceCntBox.setItemData(1, self.QColorWheel[int(self.id + 1)%5], QtCore.Qt.TextColorRole)
-			self.traceCntBox.setItemData(2, self.QColorWheel[int(self.id + 2)%5], QtCore.Qt.TextColorRole)
-			self.traceCntBox.setItemData(3, self.QColorWheel[int(self.id + 3)%5], QtCore.Qt.TextColorRole)
-			self.traceCntBox.setItemData(4, self.QColorWheel[int(self.id + 4)%5], QtCore.Qt.TextColorRole)
-			self.traceCntBox.setItemData(0, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
-			self.traceCntBox.setItemData(1, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
-			self.traceCntBox.setItemData(2, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
-			self.traceCntBox.setItemData(3, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
-			self.traceCntBox.setItemData(4, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
-			
-			self.traceCntBox.currentIndexChanged.connect(self.alterColor)
-
-			self.plotTitleLbl = QtGui.QLabel()
-			self.plotTitleLbl.setText(self.plotTitle)
-			self.plotTitleLbl.setObjectName('plotTitleLbl')
-			self.plotTitleLbl.setStyleSheet("QLabel#plotTitleLbl {color: rgb(131,131,131); font: 11pt;}")
-			self.traceCntLbl = QtGui.QLabel()
-			self.traceCntLbl.setText('Plot Previous Traces:')
-			self.traceCntLbl.setObjectName('traceCntLbl')
-			self.traceCntLbl.setStyleSheet("QLabel#traceCntLbl {color: rgb(131,131,131); font: 10pt;}")
-			
-			self.layout.addWidget(self.plot1D, *(1,0, 1, 50))
-			self.layout.addWidget(self.traceCntBox, *(0,43))
-			self.layout.addWidget(self.traceCntLbl, *(0,42))
-			self.layout.addWidget(self.plotTitleLbl, *(0,2))
-			self.setLayout(self.layout)
-		else:
-			self.plot1D.clear()
-			self.plotTitleLbl.setText(self.plotTitle)
-			self.plotTitleLbl.setStyleSheet("QLabel#plotTitleLbl {color: rgb(131,131,131); font: 11pt;}")
+		
+		self.plot1D = pg.PlotWidget()
+		self.plot1D.showAxis('right', show = True)
+		self.plot1D.showAxis('top', show = True)
 		self.plot1D.setLabel('left', self.plotInfo['y axis'])
 		self.plot1D.setLabel('bottom', self.plotInfo['x axis'])
 		self.plot1D.enableAutoRange(enable = True)
-		self.traceCntBox.setCurrentIndex(0)
-	
+
+		
+		self.traceCntBox = QtGui.QComboBox()
+		self.traceCntBox.setObjectName('traceCntBox')
+		
+
+		self.currentTraceColor = str(self.colorWheel[int(self.id)%5])
+		self.traceCntStyle = "QComboBox#traceCntBox{width: 20px; color: rgb(131,131,131); background-color: 'balck';  border: 2px solid rgb(131,131,131); border-radius: 5px;  "
+		self.styleColorTxt = 'color: rgb'+self.currentTraceColor+';}'
+		self.traceCntBox.setStyleSheet(self.traceCntStyle+self.styleColorTxt)
+		self.traceCntBox.insertItem(0, '1')
+		self.traceCntBox.insertItem(1, '2')
+		self.traceCntBox.insertItem(2, '3')
+		self.traceCntBox.insertItem(3, '4')
+		self.traceCntBox.insertItem(4, '5')
+		self.traceCntBox.setItemData(0, self.QColorWheel[int(self.id)%5], QtCore.Qt.TextColorRole)
+		self.traceCntBox.setItemData(1, self.QColorWheel[int(self.id + 1)%5], QtCore.Qt.TextColorRole)
+		self.traceCntBox.setItemData(2, self.QColorWheel[int(self.id + 2)%5], QtCore.Qt.TextColorRole)
+		self.traceCntBox.setItemData(3, self.QColorWheel[int(self.id + 3)%5], QtCore.Qt.TextColorRole)
+		self.traceCntBox.setItemData(4, self.QColorWheel[int(self.id + 4)%5], QtCore.Qt.TextColorRole)
+		self.traceCntBox.setItemData(0, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
+		self.traceCntBox.setItemData(1, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
+		self.traceCntBox.setItemData(2, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
+		self.traceCntBox.setItemData(3, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
+		self.traceCntBox.setItemData(4, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
+		
+		self.traceCntBox.currentIndexChanged.connect(self.alterColor)
+
+		self.plotTitleLbl = QtGui.QLabel()
+		self.plotTitleLbl.setText(self.plotTitle)
+		self.plotTitleLbl.setObjectName('plotTitleLbl')
+		self.plotTitleLbl.setStyleSheet("QLabel#plotTitleLbl {color: rgb(131,131,131); font: bold 11pt;}")
+		self.traceCntLbl = QtGui.QLabel()
+		self.traceCntLbl.setText('Plot Previous Traces:')
+		self.traceCntLbl.setObjectName('traceCntLbl')
+		self.traceCntLbl.setStyleSheet("QLabel#traceCntLbl {color: rgb(131,131,131); font: 10pt;}")
+		
+		self.layout.addWidget(self.plot1D, *(1,0, 1, 50))
+		self.layout.addWidget(self.traceCntBox, *(0,43))
+		self.layout.addWidget(self.traceCntLbl, *(0,42))
+		self.layout.addWidget(self.plotTitleLbl, *(0,9))
+		self.setLayout(self.layout)
+		
+		
+		
 		self.xScale = np.absolute((self.extents[1] - self.extents[0])/ self.pxsize)
 		if self.extents[0] < self.extents[1]:
 			self.xBins = np.linspace(self.extents[0] - 0.5*self.xScale, self.extents[1] + 0.5*self.xScale, self.pxsize + 1)
 		else:
 			self.xBins = np.linspace(self.extents[0] + 0.5*self.xScale, self.extents[1] - 0.5*self.xScale, self.pxsize + 1)
-		self.XplotData, self.YplotData = {}, {}
-		self.back0, self.back1, self.back2, self.back3, self.back4 = pg.PlotCurveItem(), pg.PlotCurveItem(), pg.PlotCurveItem(), pg.PlotCurveItem(), pg.PlotCurveItem()
-		self.oldTraces = [self.back0, self.back1, self.back2, self.back3, self.back4]
+		self.XplotData = [[],[],[],[]]
+		self.YplotData = [[],[],[],[]]
 			
 	def alterColor(self):
 		i = self.traceCntBox.currentIndex()
-		oldTC = self.traceCnt
-		self.traceCnt = int(i)
 		self.currentTraceColor = str(self.colorWheel[int(self.id + i)%5])
 		self.styleColorTxt = 'color: rgb'+self.currentTraceColor+';}'
 		self.traceCntBox.setStyleSheet(self.traceCntStyle+self.styleColorTxt)
-		if int(i) > oldTC:
-			for j in range(oldTC + 1, int(i)+1):
-				if j < self.numLines: 
-					self.plot1D.addItem(self.oldTraces[j])
-		elif int(i) < oldTC:
-			for j in range(int(i)+1, oldTC+1):
-				if j < self.numLines: 
-					self.oldTraces[j].setData(x = [], y = [])
-					self.plot1D.removeItem(j)
-
-		
-
-
-		
+		self.traceCnt = int(i)
+		print('Trace Count: ', self.traceCnt)
 	
 	@inlineCallbacks
 	def setupListener(self, c):
 		try: 
-			if self.cxnName is None:
-				cxnName = 'plot' + str(self.id)
-				from labrad.wrappers import connectAsync
-				self.cxn = yield connectAsync(name = cxnName)
-				self.dv = yield self.cxn.data_vault
+			cxnName = 'plot' + str(self.id)
+			from labrad.wrappers import connectAsync
+			self.cxn = yield connectAsync(name = cxnName)
+			self.dv = yield self.cxn.data_vault
 			yield self.dv.cd(self.dir)
 			yield self.dv.open(self.fileName)
 
@@ -1156,9 +710,8 @@ class plot1DWindow(QtGui.QDialog):
 
 			newData = yield self.dv.get()
 			
-			if len(newData) == 0 or len(newData[0]) == 0:
-				pass
-			else:
+			if len(newData[0]) != 0:
+
 				inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex])
 				newData = np.delete(np.asarray(newData), inx, axis = 1)
 				
@@ -1181,18 +734,18 @@ class plot1DWindow(QtGui.QDialog):
 					xVals, yVals = newData[::, x_ind], newData[::, y_ind]
 
 				self.plot1D.clear()
-				self.oldTraces[0].setData(x = xVals, y = yVals, pen =pg.mkPen(color=self.penColor))
-				self.plot1D.addItem(self.oldTraces[0])
+				self.plot1D.plot(x = xVals, y = yVals, pen =pg.mkPen(color=self.penColor))
 		except Exception as inst:
-			print 'Following error was thrown: '
-			print inst
-			print 'Error thrown on line: '
-			print sys.exc_traceback.tb_lineno 
+			print('Following error was thrown: ')
+			print(inst)
+			print('Error thrown on line: ')
+			print(sys.exc_traceback.tb_lineno) 
 			
 	@inlineCallbacks
 	def addListen(self, c):
 		yield self.dv.signal__data_available(self.id)
 		yield self.dv.addListener(listener=self.updatePlot, ID=self.id)
+		print('1D listener added with ID: ' + str(self.id))
 
 	@inlineCallbacks
 	def updatePlot(self, c, signal):
@@ -1226,18 +779,11 @@ class plot1DWindow(QtGui.QDialog):
 					else:
 						xVals = self.Data[p[-1][0]+1::, x_ind]
 						yVals = self.Data[p[-1][0]+1::, y_ind]
-						if len(p) > 5:
-							i = 1
-							while i <= np.amin((len(p), 5)):
-								self.XplotData[(i)%5] = self.Data[p[-i - 1][0] + 1:p[-i][0] + 1, x_ind]
-								self.YplotData[(i)%5] = self.Data[p[-i - 1][0] + 1:p[-i][0] + 1, y_ind]
-								i += 1
-						else:
-							for i in range(1, len(p)):
-								self.XplotData[(i)%5] = self.Data[p[-i - 1][0]+1:p[-i][0] + 1, x_ind]
-								self.YplotData[(i)%5] = self.Data[p[-i - 1][0]+1:p[-i][0] + 1, y_ind]
-							self.XplotData[len(p)] = self.Data[0:p[-len(p)][0] + 1, x_ind]
-							self.YplotData[len(p)] = self.Data[0:p[-len(p)][0] + 1, y_ind]
+						i = 2
+						while i < np.amin((len(p), 6)):
+							self.XplotData[(i - 2)%4] = self.Data[p[-i][0]+1:p[-i + 1][0]+1, x_ind]
+							self.YplotData[(i - 2)%4] = self.Data[p[-i][0]+1:p[-i + 1][0]+1, y_ind]
+							i += 1
 						self.numLines = len(p)
 				else:
 					xVals, yVals = self.Data[::, x_ind], self.Data[::, y_ind]
@@ -1245,28 +791,23 @@ class plot1DWindow(QtGui.QDialog):
 			else:
 				xVals, yVals = self.Data[::, x_ind], self.Data[::, y_ind]
 
-
 			self.plot1D.clear()
-			self.oldTraces[0].setData(x = xVals, y = yVals, pen = pg.mkPen(color=self.penColor))
-			self.plot1D.addItem(self.oldTraces[0])
-			i = 1
-			while i <= self.traceCnt and i	<= self.numLines:
-				self.oldTraces[i].setData(x = self.XplotData[(i)%5], y = self.YplotData[(i)%5], pen = pg.mkPen(color = self.colorWheel[int(self.id+i)%5]))
-				self.plot1D.addItem(self.oldTraces[i])
+			self.plot1D.plot(x = xVals, y = yVals, pen = pg.mkPen(color=self.penColor))
+			i = 0
+			while i < self.traceCnt and i + 1 < self.numLines:
+				self.plot1D.plot(x = self.XplotData[(i)%4], y = self.YplotData[(i)%4], pen = pg.mkPen(color = self.colorWheel[int(self.id+i+1)%5]))
 				i += 1
 		except Exception as inst:
-			print 'Following error was thrown: '
-			print inst
-			print 'Error thrown on line: '
-			print sys.exc_traceback.tb_lineno 
+			print('Following error was thrown: ')
+			print(inst)
+			print('Error thrown on line: ')
+			print(sys.exc_traceback.tb_lineno) 
 	def sleep(self,secs):
 		d = Deferred()
 		self.reactor.callLater(secs,d.callback,'Sleeping')
 		return d
 
 	def closeEvent(self, e):
-		self.mainWin.existing1DPlotDict.pop(self.plotWinID)
-		self.mainWin.renumPlotDicts(1)
 		self.cxn.disconnect()
 		self.close()
 
@@ -1279,6 +820,9 @@ class plotSaved1DWindow(QtGui.QWidget):
 		self.dir = dir
 		self.plotInfo = plotInfo
 		
+		print(self.plotInfo)
+		print('--------------------------------------------')
+
 		self.xIndex = self.plotInfo['x index']
 		self.yIndex = self.plotInfo['y index']
 		
@@ -1293,10 +837,7 @@ class plotSaved1DWindow(QtGui.QWidget):
 		self.notes = ''
 		self.plotTitle = self.plotInfo['title']
 		if self.plotTitle[0:5] == 'Plot ':
-			self.plotTitle = str(self.file) + ': ' + self.yAxis + ' vs. ' + self.xAxis
-		else:
-			self.plotTitle = str(self.file) + ': ' + self.plotTitle
-		self.setWindowTitle(self.plotTitle)
+			self.plotTitle = self.yAxis + ' vs. ' + self.xAxis
 		self.pdfNum = 1
 		
 		self.resize(675,330)
@@ -1395,6 +936,7 @@ class plotSaved1DWindow(QtGui.QWidget):
 		self.dv = yield self.cxnS.data_vault
 		yield self.dv.cd(self.dir)
 		yield self.dv.open(self.file)
+		print('loading data')
 		self.loadData(self.reactor)
 	
 	def sleep(self,secs):
@@ -1407,7 +949,7 @@ class plotSaved1DWindow(QtGui.QWidget):
 		getFlag = True
 		self.Data = np.array([])
 		while getFlag == True:
-			line = yield self.dv.get(1000L)
+			line = yield self.dv.get(1000)
 
 			try:
 				if len(self.Data) != 0 and len(line) > 0:
@@ -1418,6 +960,7 @@ class plotSaved1DWindow(QtGui.QWidget):
 					getFlag = False
 			except:
 				getFlag = False
+		print('got all data')
 
 		inds =[self.xIndex, self.yIndex]
 		inx = np.delete(np.arange(0, len(self.Data[0])), inds)
@@ -1460,18 +1003,22 @@ class plotSaved1DWindow(QtGui.QWidget):
 			folder = os.getcwd()
 			file = str(self.plotTitle) + time.strftime("%Y-%m-%d_%H:%M") + '.pdf'
 		self.pdfFile = folder + '//tmp' + str(time.time()) + '.png'
+		print('PDF File: ', self.pdfFile)
 		init_loc = os.getcwd()
 		os.chdir(folder)
 		if os.path.isfile(file):
 			os.remove(file)
 		if os.path.isfile(self.pdfFile):
 			os.remove(self.pdfFile)
+		print('sleeping')
 		yield self.sleep(.5)
 		self.pdfNum += 1
+		print('going to export')
 		yield self.exportPng(init_loc, folder, file)
 		
 	@inlineCallbacks
 	def exportPng(self, init_loc, folder, file, c = None):
+		print('sting export')
 		exporter = pg.exporters.ImageExporter(self.plot1D.plotItem)
 		exporter.export(self.pdfFile)
 		header = self.plotTitle
@@ -1488,18 +1035,18 @@ class plotSaved1DWindow(QtGui.QWidget):
 		template = env.get_template(template_file)
 		return template.render(**kwargs)
 
-	def print_pdf(self, html, destination):
-		global app
-		web = QWebView()
-		web.setHtml(html)
-		application = app.instance()
-		application.processEvents()
+	# def print_pdf(self, html, destination):
+		# global app
+		# web = QWebView()
+		# web.setHtml(html)
+		# application = app.instance()
+		# application.processEvents()
 	 
-		printer = QPrinter()
-		printer.setPageSize(QPrinter.A4)
-		printer.setOutputFormat(QPrinter.PdfFormat)
-		printer.setOutputFileName(destination)
-		web.print_(printer)
+		# printer = QPrinter()
+		# printer.setPageSize(QPrinter.A4)
+		# printer.setOutputFormat(QPrinter.PdfFormat)
+		# printer.setOutputFileName(destination)
+		# web.print_(printer)
 		
 	 
 	@inlineCallbacks
@@ -1548,13 +1095,15 @@ class plotSaved1DWindow(QtGui.QWidget):
 			self.notes = self.noteEdits.textEditor.toPlainText()
 		
 class plotSaved2DWindow(QtGui.QWidget):
-	def __init__(self, reactor, fileDV, dir, plotInfo, yMovePos ):
+	def __init__(self, reactor, file, dir, plotInfo, yMovePos ):
 		super(plotSaved2DWindow, self).__init__()
 
 		self.reactor = reactor
-		self.file = fileDV
+		self.file = file
 		self.dir = dir
 		self.plotInfo = plotInfo
+		print(self.plotInfo)
+		print('--------------------------------------------')
 
 		self.xIndex = self.plotInfo['x index']
 		self.yIndex = self.plotInfo['y index']
@@ -1563,16 +1112,11 @@ class plotSaved2DWindow(QtGui.QWidget):
 		self.xAxis = self.plotInfo['x axis']
 		self.yAxis = self.plotInfo['y axis']
 		self.zAxis = self.plotInfo['z axis']
-		
-		self.connect(QtGui.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL+ QtCore.Qt.Key_C), self), QtCore.SIGNAL('activated()'),self.copyPlotToClip)
 
 		self.notes = ''
 		self.plotTitle = self.plotInfo['title']
 		if self.plotTitle[0:5] == 'Plot ':
-			self.plotTitle = str(self.file) + ': ' + self.zAxis + ' vs. ' + self.xAxis + ' and ' + self.yAxis
-		else:
-			self.plotTitle = str(self.file) + ': ' + self.plotTitle
-		self.setWindowTitle(self.plotTitle)
+			self.plotTitle = self.zAxis + ' vs. ' + self.xAxis + ' and ' + self.yAxis
 		self.pdfNum = 1
 		
 		self.resize(800,800)
@@ -1664,16 +1208,10 @@ class plotSaved2DWindow(QtGui.QWidget):
 		self.savePDFMenu = QtGui.QMenu()
 		pdf1D = QtGui.QAction("Save 1D trace", self)
 		pdf2D = QtGui.QAction("Save 2D plot", self)
-		append2D = QtGui.QAction("Append 2D plot", self)
-		append1D = QtGui.QAction("Append 1D plot", self)
 		pdf1D.triggered.connect(lambda: self.savePDF(1))
 		pdf2D.triggered.connect(lambda: self.savePDF(2))
-		append2D.triggered.connect(lambda: self.savePDF(3))
-		append1D.triggered.connect(lambda: self.savePDF(4))
 		self.savePDFMenu.addAction(pdf2D)
 		self.savePDFMenu.addAction(pdf1D)
-		self.savePDFMenu.addAction(append2D)
-		self.savePDFMenu.addAction(append1D)
 		self.savePDFBtn.setMenu(self.savePDFMenu)
 		
 		self.editNotesBtn.clicked.connect(self.openNotepad)
@@ -1753,34 +1291,6 @@ class plotSaved2DWindow(QtGui.QWidget):
 		
 		self.openFile(self.reactor)
 		
-	def copyPlotToClip(self):
-		r = self.mainPlot.ui.histogram.region.getRegion()
-		self.mainPlot.ui.histogram.vb.setYRange(*r)
-		#create ImageExpoerters:
-		mainExp = pg.exporters.ImageExporter(self.viewBig)
-		colorAxisExp = pg.exporters.ImageExporter(self.mainPlot.ui.histogram.axis)
-		colorBarExp = pg.exporters.ImageExporter(self.mainPlot.ui.histogram.gradient)
-		#create QImages:
-		main =mainExp.export(toBytes=True)
-		colorAxis =colorAxisExp.export(toBytes=True)
-		colorBar = colorBarExp.export(toBytes=True)
-		#define teh size:
-		x = main.width() + colorAxis.width() + colorBar.width()
-		y = main.height()
-		#to get everything in the same height:
-		yOffs = [0,0.5*(y-colorAxis.height()),0.5*(y-colorBar.height())]
-		result = QtGui.QImage(x, y ,QtGui.QImage.Format_RGB32)
-		painter = QtGui.QPainter(result)
-		posX = 0
-		for img,y in zip((main,colorAxis,colorBar),yOffs):
-				#draw every part in different positions:
-				painter.drawImage(posX, y, img)
-				posX += img.width()
-		painter.end()
-		#save to file
-		QApplication.clipboard().setImage(result)
-
-		
 	def updateTrace(self):
 		pos = self.tracePosBox.value()
 		if self.xySelectBox.currentIndex() == 1:
@@ -1794,10 +1304,12 @@ class plotSaved2DWindow(QtGui.QWidget):
 	@inlineCallbacks
 	def openFile(self, c):
 		from labrad.wrappers import connectAsync
+
 		self.cxnS = yield connectAsync()
 		self.dv = yield self.cxnS.data_vault
 		yield self.dv.cd(self.dir)
 		yield self.dv.open(self.file)
+		print('loading data')
 		self.loadData(self.reactor)
 	
 	def sleep(self,secs):
@@ -1810,7 +1322,7 @@ class plotSaved2DWindow(QtGui.QWidget):
 		getFlag = True
 		self.Data = np.array([])
 		while getFlag == True:
-			line = yield self.dv.get(1000L)
+			line = yield self.dv.get(1000)
 
 			try:
 				if len(self.Data) != 0 and len(line) > 0:
@@ -1821,6 +1333,7 @@ class plotSaved2DWindow(QtGui.QWidget):
 					getFlag = False
 			except:
 				getFlag = False
+		print('got all data')
 
 		inds =[self.xIndex, self.yIndex, self.zIndex]
 		inx = np.delete(np.arange(0, len(self.Data[0])), inds)
@@ -1828,6 +1341,8 @@ class plotSaved2DWindow(QtGui.QWidget):
 		self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
 		self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
 		self.z_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
+		#self.xData = self.Data[::, self.xIndex]
+		#self.yData = self.Data[::, self.yIndex]
 
 		params = yield self.dv.get_parameters()
 					
@@ -1850,6 +1365,7 @@ class plotSaved2DWindow(QtGui.QWidget):
 			if gotX == True and gotY == True:
 				self.extents = [xMin, xMax, yMin, yMax]
 				self.numPts = [int(xPnts), int(yPnts)]
+				print('got extents from params')
 			else:
 				pass
 	
@@ -1862,11 +1378,15 @@ class plotSaved2DWindow(QtGui.QWidget):
 			xPts = spst.mode(yJumps)[0][0]
 			self.extents = [np.amin(self.Data[::, self.x_ind]), np.amax(self.Data[::, self.x_ind]), np.amin(self.Data[::, self.y_ind]), np.amax(self.Data[::, self.y_ind])]
 			self.numPts = [int(xPts), int(yPts)]
+			print('got extents from magic')
 
+		print('Extents: ', self.extents)
+		print('Points: ', self.numPts)
 		self.x0, self.y0 = self.extents[0], self.extents[2]
 		self.xscale = float((self.extents[1] - self.extents[0])/self.numPts[0])
 		self.yscale = float((self.extents[3] - self.extents[2])/self.numPts[1])
-
+		
+		print('binning data')
 
 		if self.extents[0] < self.extents[1]:
 			self.xBins = np.linspace(self.extents[0] - 0.5*self.xscale, self.extents[1] + 0.5*self.xscale, self.numPts[0] + 1)
@@ -1877,7 +1397,8 @@ class plotSaved2DWindow(QtGui.QWidget):
 		else:
 			self.yBins = np.linspace(self.extents[3] - 0.5*self.yscale, self.extents[2] + 0.5*self.yscale, self.numPts[1] + 1)
 		self.plotData = np.zeros([self.numPts[0], self.numPts[1]])
-
+		
+		print('sorting the matrix')
 		try:
 			self.Data[::, self.x_ind] = np.digitize(self.Data[::, self.x_ind], self.xBins)-1
 			self.Data[::, self.y_ind] = np.digitize(self.Data[::, self.y_ind], self.yBins)-1
@@ -1885,10 +1406,10 @@ class plotSaved2DWindow(QtGui.QWidget):
 			for cell in self.Data:
 				self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]
 		except Exception as inst:
-			print 'Following error was thrown: '
-			print inst
-			print 'Error thrown on line: '
-			print sys.exc_traceback.tb_lineno 
+			print('Following error was thrown: ')
+			print(inst)
+			print('Error thrown on line: ')
+			print(sys.exc_traceback.tb_lineno) 
 		
 		self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[self.x0, self.y0],scale=[self.xscale, self.yscale])
 		
@@ -1912,7 +1433,7 @@ class plotSaved2DWindow(QtGui.QWidget):
 		elif i == 1:
 			self.updateYLineBox()
 		else:
-			print 'this is impossible!'
+			print('this is impossible!')
 			
 	def updatePlot1D(self, pos, axis):
 		#self.extents = [xMin, xMax, yMin, yMax]
@@ -1935,7 +1456,7 @@ class plotSaved2DWindow(QtGui.QWidget):
 				self.plot1D.plot(x = xVals, y = yVals, pen = 0.5)
 				self.plot1D.setLabel('bottom', self.xAxis)
 		else:
-			print 'you have entered another dimension'
+			print('you have entered another dimension')
 			
 	def getSaveData(self, ext):
 		if ext == 'pdf':
@@ -1960,7 +1481,7 @@ class plotSaved2DWindow(QtGui.QWidget):
 		fold  = self.getSaveData('mat')
 		xVals = np.linspace(self.extents[0], self.extents[1], int(self.numPts[0]))
 		yVals = np.linspace(self.extents[2], self.extents[3], int(self.numPts[1]))
-		xInd, yInd = np.linspace(0,	 self.numPts[0] - 1,  int(self.numPts[0])), np.linspace(0,	self.numPts[1] - 1, int(self.numPts[1]))
+		xInd, yInd = np.linspace(0,  self.numPts[0] - 1,  int(self.numPts[0])), np.linspace(0,  self.numPts[1] - 1, int(self.numPts[1]))
 		zX, zY, zXI, zYI = np.ones([1,int(self.numPts[1])]), np.ones([1,int(self.numPts[0])]), np.ones([1,int(self.numPts[1])]), np.ones([1,int(self.numPts[0])])
 		X, Y,  XI, YI = np.outer(xVals, zX), np.outer(zY, yVals), np.outer(xInd, zXI), np.outer(zYI, yInd)
 		XX, YY, XXI, YYI, ZZ = X.flatten(), Y.flatten(), XI.flatten(), YI.flatten(), self.plotData.flatten()
@@ -1985,6 +1506,11 @@ class plotSaved2DWindow(QtGui.QWidget):
 
 		init_loc = os.getcwd()
 		os.chdir(folder)
+		if os.path.isfile(file):
+			os.remove(file)
+		if os.path.isfile(self.pdfFile):
+			os.remove(self.pdfFile)
+
 		yield self.sleep(0.5)
 		self.pdfNum += 1
 
@@ -1992,54 +1518,29 @@ class plotSaved2DWindow(QtGui.QWidget):
 		
 	@inlineCallbacks
 	def exportPng(self, init_loc, folder, file, plot, c = None):
-		if plot == 2 or plot == 3:
+		print('stiartng export')
+		print(plot)
+		if plot == 2:
 			#creates a .png file of the 2D plot window
+			print('exportin 2d')
 			self.xLine.hide()
 			self.yLine.hide()
-			#exporter = pg.exporters.ImageExporter(self.viewBig)
-			#exporter.export(self.pdfFile)
-			
-			r = self.mainPlot.ui.histogram.region.getRegion()
-			self.mainPlot.ui.histogram.vb.setYRange(*r)
-			#create ImageExpoerters:
-			mainExp = pg.exporters.ImageExporter(self.viewBig)
-			colorAxisExp = pg.exporters.ImageExporter(self.mainPlot.ui.histogram.axis)
-			colorBarExp = pg.exporters.ImageExporter(self.mainPlot.ui.histogram.gradient)
-			#create QImages:
-			main =mainExp.export(toBytes=True)
-			colorAxis =colorAxisExp.export(toBytes=True)
-			colorBar = colorBarExp.export(toBytes=True)
-			#define teh size:
-			x = main.width() + colorAxis.width() + colorBar.width()
-			y = main.height()
-			#to get everything in the same height:
-			yOffs = [0,0.5*(y-colorAxis.height()),0.5*(y-colorBar.height())]
-			result = QtGui.QImage(x, y ,QtGui.QImage.Format_RGB32)
-			painter = QtGui.QPainter(result)
-			posX = 0
-			for img,y in zip((main,colorAxis,colorBar),yOffs):
-					#draw every part in different positions:
-					painter.drawImage(posX, y, img)
-					posX += img.width()
-			painter.end()
-			#save to file
-			result.save(self.pdfFile)		
-			
+			exporter = pg.exporters.ImageExporter(self.viewBig)
+			exporter.export(self.pdfFile)
 			self.xLine.show()
 			self.yLine.show()
-			header = str(self.file) + ': ' + self.plotTitle
-		elif plot == 1 or plot == 4:
+			header = self.plotTitle
+		elif plot == 1:
 			#creates a .png file of the 2D plot window
 			exporter = pg.exporters.ImageExporter(self.plot1D.plotItem)
 			exporter.export(self.pdfFile)
-			header = str(self.file) + ': ' + self.plotTitle
 				
 
 
 		os.chdir(init_loc)
 		yield self.sleep(0.5)
 		#generates the PDF
-		yield self.genPDF(folder, file, header, plot)
+		yield self.genPDF(folder, file, header)
 		self.pdfNum += 1
 		
 
@@ -2048,24 +1549,24 @@ class plotSaved2DWindow(QtGui.QWidget):
 		template = env.get_template(template_file)
 		return template.render(**kwargs)
 
-	def print_pdf(self, html, destination):
-		global app
-		web = QWebView()
-		web.setHtml(html)
-		application = app.instance()
-		application.processEvents()
+	# def print_pdf(self, html, destination):
+		# global app
+		# web = QWebView()
+		# web.setHtml(html)
+		# application = app.instance()
+		# application.processEvents()
 	 
-		printer = QPrinter()
-		printer.setPageSize(QPrinter.A4)
-		printer.setOutputFormat(QPrinter.PdfFormat)
-		printer.setOutputFileName(destination)
-		web.print_(printer)
+		# printer = QPrinter()
+		# printer.setPageSize(QPrinter.A4)
+		# printer.setOutputFormat(QPrinter.PdfFormat)
+		# printer.setOutputFileName(destination)
+		# web.print_(printer)
 		
 	 
 	@inlineCallbacks
-	def genPDF(self, folder, fileName, header, plot):
-		print 'generating pdf'
+	def genPDF(self, folder, file, header):
 		yield self.sleep(1)
+		temp_loc = ''
 		params = yield self.dv.get_parameters()
 		parList = []
 		if params != None:
@@ -2081,51 +1582,24 @@ class plotSaved2DWindow(QtGui.QWidget):
 			prgs = []
 		dataSet = header
 		dateTime = time.strftime("%Y-%m-%d %H:%M")
-		try:
-			html = self.render_template(
-				"report.html",
-				data_set = dataSet,
-				date_time = dateTime,
-				parameters = parList,
-				paragraphs = prgs,
-				tmp_loc = temp_loc
-				
-			)
-		except Exception as inst:
-			print 'Following error was thrown: '
-			print inst
-			print 'Error thrown on line: '
-			print sys.exc_traceback.tb_lineno 
 		
-		if plot < 3:
-			self.print_pdf(html, str(fileName))
-		else:
-			tmp_pdf = folder + str(time.time()) + 'tmp_pdf.pdf'
-			toMerge = str(fileName)
-			self.print_pdf(html, str(tmp_pdf))
-			merger = PdfFileMerger()
-			try:
-				merger.append(PdfFileReader(file(toMerge, 'rb')))
-				merger.append(PdfFileReader(file(tmp_pdf, 'rb')))
+		html = self.render_template(
+			"report.html",
+			data_set = dataSet,
+			date_time = dateTime,
+			parameters = parList,
+			paragraphs = prgs,
+			tmp_loc = temp_loc
+			
+		)
 
-				merger.write(toMerge)	
-			except Exception as inst:
-				print 'Following error was thrown: '
-				print inst
-				print 'Error thrown on line: '
-				print sys.exc_traceback.tb_lineno 
+
+
+		self.pdfNum += 1
+		#self.print_pdf(html, str(file)) # Not supported in PyQt5, need to find a workaround
+		if os.path.isfile(self.pdfFile):
+			os.remove(self.pdfFile)
 		tmp_loc = ''
-		yield self.sleep(0.5)
-		try:
-			if os.path.isfile(self.pdfFile):
-				os.remove(self.pdfFile)
-			if plot >= 3 and os.path.isfile(tmp_pdf):
-				os.remove(tmp_pdf)
-		except Exception as inst:
-			print 'Following error was thrown: '
-			print inst
-			print 'Error thrown on line: '
-			print sys.exc_traceback.tb_lineno 
 		os.chdir(init_loc)
 		
 		
@@ -2245,7 +1719,7 @@ class textEditor(QtGui.QPlainTextEdit):
 				mypainter.drawText(0, top, self.lineNumberArea.width(), height,
 				 QtCore.Qt.AlignRight, number)
 
-			block = block.next()
+			block = next(block)
 			top = bottom
 			bottom = top + self.blockBoundingRect(block).height()
 			blockNumber += 1
@@ -2286,9 +1760,6 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 		self.mainWin = parent
 		
 		self.setupUi(self)
-		icon = QtGui.QIcon()
-		icon.addPixmap(QtGui.QPixmap(guiIconPath))
-		self.setWindowIcon(icon)
 		self.moveDefault()
 		
 		self.formFlag = True
@@ -2306,6 +1777,18 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 		self.plt1DSetBox.hide()
 		self.plt2DSetLbl.hide()
 		self.plt1DSetLbl.hide()
+
+		'''
+		if fresh != 2:
+			self.plt2DSetBox.hide()
+			self.plt1DSetBox.hide()
+			self.plt2DSetLbl.hide()
+			self.plt1DSetLbl.hide()
+		else:
+			self.plt1DSetBox.stateChanged.connect(self.set1D)
+			self.plt2DSetBox.stateChanged.connect(self.set1D)
+			self.dataSetType = 2
+		'''
 		
 		self.plot2DInfo = {}
 		self.plot1DInfo = {}
@@ -2520,7 +2003,7 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 	def popAxes(self, c = None):
 		yield self.dv.cd(self.dir)
 		yield self.dv.open(self.file)
-		vars = yield self.dv.variables()
+		vars =	  yield self.dv.variables()
 		self.indVars = vars[0]
 		self.depVars = vars[1]
 		
@@ -2566,6 +2049,8 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 					
 					if params != None:
 						params = dict((x,y) for x,y in params)
+						print(params)
+						
 						for plot2D in self.plot2DInfo:
 							x_axis = self.plot2DInfo[plot2D]['x axis']
 							y_axis = self.plot2DInfo[plot2D]['y axis']
@@ -2630,20 +2115,20 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 										self.plot1DInfo[plot1D]['x range'] = self.extents[key]
 										self.plot1DInfo[plot1D]['x points'] = self.pxsize[key]
 						
-						print '2D Info: ', self.plot2DInfo
-						print '1D Info: ', self.plot1DInfo
+						print('2D Info: ', self.plot2DInfo)
+						print('1D Info: ', self.plot1DInfo)
 						if self.fresh == 0 or self.fresh == 1:
 							yield self.mainWin.openLivePlots(copy.copy(self.plot2DInfo), copy.copy(self.plot1DInfo), copy.copy(self.fresh))
 							yield self.sleep(0.5)
 							self.close()
 			except Exception as inst:
-				print 'Following error was thrown: '
-				print inst
-				print 'Error thrown on line: '
-				print sys.exc_traceback.tb_lineno 
+				print('Following error was thrown: ')
+				print(inst)
+				print('Error thrown on line: ')
+				print(sys.exc_traceback.tb_lineno) 
 		elif self.fresh == 2:
-			print '2D Info: ', self.plot2DInfo
-			print '1D Info: ', self.plot1DInfo
+			print(self.plot2DInfo) 
+			print(self.plot1DInfo) 
 			if self.plot2DInfo == {} and self.plot1DInfo == {}:
 				pass
 			elif self.plot1DInfo == {}:
@@ -2666,6 +2151,7 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 		self.close()
 
 	def closeEvent(self, e):
+		print('closing the window')
 		self.close()
 
 class dirExplorer(QtGui.QDialog, Ui_DirExp):
@@ -2675,9 +2161,6 @@ class dirExplorer(QtGui.QDialog, Ui_DirExp):
 
 		self.reactor = reactor
 		self.setupUi(self)
-		icon = QtGui.QIcon()
-		icon.addPixmap(QtGui.QPixmap(guiIconPath))
-		self.setWindowIcon(icon)
 		self.moveDefault()
 		
 		self.mainWin = parent
@@ -2709,7 +2192,7 @@ class dirExplorer(QtGui.QDialog, Ui_DirExp):
 			self.cxn = yield connectAsync(name = 'dirExplorer')
 			self.dv = yield self.cxn.data_vault
 		except:
-			print 'Either no LabRad connection or DataVault connection.'
+			print('Either no LabRad connection or DataVault connection.')
 		self.popDirs(self.reactor)
 		
 
@@ -2806,9 +2289,6 @@ class dataVaultExplorer(QtGui.QDialog, Ui_DataVaultExp):
 		self.source = source
 		self.listenDir = listenDir
 		self.setupUi(self)
-		icon = QtGui.QIcon()
-		icon.addPixmap(QtGui.QPixmap(guiIconPath))
-		self.setWindowIcon(icon)
 		self.moveDefault()
 		
 		self.mainWin = parent
@@ -2820,7 +2300,7 @@ class dataVaultExplorer(QtGui.QDialog, Ui_DataVaultExp):
 		self.selectedFile = ''
 		self.selectedDir = ['']
 		self.currentDir = self.listenDir
-		print 'Setting directory: ', self.currentDir
+		print('Setting directory: ', self.currentDir)
 
 		self.dirList.itemDoubleClicked.connect(self.updateDirs)
 		self.fileList.itemClicked.connect(self.fileSelect)
@@ -2841,7 +2321,7 @@ class dataVaultExplorer(QtGui.QDialog, Ui_DataVaultExp):
 			self.cxn = yield connectAsync(name = 'dvExplorer')
 			self.dv = yield self.cxn.data_vault
 		except:
-			print 'Either no LabRad connection or DataVault connection.'
+			print('Either no LabRad connection or DataVault connection.')
 		self.popDirs(self.listenDir, self.reactor)
 
 	@inlineCallbacks
@@ -2921,6 +2401,7 @@ class dataVaultExplorer(QtGui.QDialog, Ui_DataVaultExp):
 			if self.selectedFile != '':
 				self.mainWin.listenPlotFile = str(self.selectedFile)
 				self.mainWin.listenTo = self.selectedDir
+				print('Doing this')
 				self.livePlot = plotSetup(self.reactor,self.selectedFile, self.selectedDir, self.cxn, self.dv, 1, self.mainWin)
 				self.accept()
 				self.livePlot.show()
@@ -2935,25 +2416,11 @@ class dataVaultExplorer(QtGui.QDialog, Ui_DataVaultExp):
 	def closeEvent(self, e):
 		self.close()
 
-class helpTextWindow(QtGui.QMainWindow, Ui_HelpWindow):
-	def __init__(self, parent = None):
-		super(helpTextWindow, self).__init__(parent)
-		QtGui.QMainWindow.__init__(self)
-		self.window = parent
-		self.setupUi(self)
-		icon = QtGui.QIcon()
-		icon.addPixmap(QtGui.QPixmap(guiIconPath))
-		self.setWindowIcon(icon)
-		
-	def closeEvent(self, e):
-		self.window.helpBtn.setEnabled(True)
-		self.close()
-		
 if __name__ == "__main__":
 	global app
 	app = QtGui.QApplication([])
-	from qtreactor import pyqt4reactor
-	pyqt4reactor.install()
+	import qt5reactor as pyqt5reactor
+	pyqt5reactor.install()
 	from twisted.internet import reactor
 	window = dvPlotter(reactor)
 	window.show()

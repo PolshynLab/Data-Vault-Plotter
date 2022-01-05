@@ -6,27 +6,19 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>300</width>
-    <height>225</height>
+    <width>301</width>
+    <height>223</height>
    </rect>
-  </property>
-  <property name="minimumSize">
-   <size>
-    <width>300</width>
-    <height>225</height>
-   </size>
-  </property>
-  <property name="maximumSize">
-   <size>
-    <width>300</width>
-    <height>225</height>
-   </size>
   </property>
   <property name="contextMenuPolicy">
    <enum>Qt::NoContextMenu</enum>
   </property>
   <property name="windowTitle">
    <string>Data Vault Plotter</string>
+  </property>
+  <property name="windowIcon">
+   <iconset resource="Resources/dvPlotterResources.qrc">
+    <normaloff>:/dvPlotter/Pictures/data.png</normaloff>:/dvPlotter/Pictures/data.png</iconset>
   </property>
   <property name="styleSheet">
    <string notr="true">#Dialog{
@@ -108,7 +100,7 @@ border-radius: 5px
 Data</string>
    </property>
   </widget>
-  <widget class="QPushButton" name="helpBtn">
+  <widget class="QPushButton" name="help">
    <property name="geometry">
     <rect>
      <x>260</x>
@@ -118,14 +110,14 @@ Data</string>
     </rect>
    </property>
    <property name="styleSheet">
-    <string notr="true">QPushButton:pressed#helpBtn{
+    <string notr="true">QPushButton:pressed#help{
 color:black;
 background-color:rgb(131,131,131);
 border: 2px solid rgb(131,131,131);
 border-radius: 5px
 }
 
-QPushButton#helpBtn{
+QPushButton#help{
 color:rgb(131,131,131);
 background-color:black;
 border: 2px solid rgb(131,131,131);
