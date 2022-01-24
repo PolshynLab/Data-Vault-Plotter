@@ -2,8 +2,8 @@ import sys
 import os
 import random
 from jinja2 import Environment, PackageLoader
-from PyQt4.QtGui import QApplication, QPrinter
-from PyQt4.QtWebKit import QWebView
+from PyQt5.QtGui, QtWidgets import QApplication, QPrinter
+from PyQt5.QtWebKit import QWebView
 
 path = sys.path[0]
 os.chdir(path)

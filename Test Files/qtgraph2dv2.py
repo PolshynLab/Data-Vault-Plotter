@@ -1,11 +1,11 @@
 import pyqtgraph as pg
-from PyQt4 import QtGui, QtCore
+from PyQt5 import QtGui, QtWidgets, QtCore
 from twisted.internet.defer import inlineCallbacks
 import numpy as np
 
 DIR_PLOT = "HZS63"
 
-class MainWindow(QtGui.QMainWindow):
+class MainWindow(QtWidgets.QMainWindow):
     """
     Plots data obtained from a 2d Sweeper
     Make more generic - > parse tags, parse attribute for live plotting,
@@ -128,12 +128,12 @@ class MainWindow(QtGui.QMainWindow):
             print "creating graph"
             self.create_graph()
 
-class Sweep2DWidget(QtGui.QWidget):
+class Sweep2DWidget(QtWidgets.QWidget):
     def __init__(self, parent=None):
         super(Sweep2DWidget, self).__init__(parent)
         # self.layout = QtGui.QHBoxLayout(self)
         self.layout = QtGui.QGridLayout(self)
-        # self.caplayout = QtGui.QVBoxLayout(self)
+        # self.caplayout = QtWidgets.QVBoxLayout(self)
         self.view1 = pg.PlotItem(title="Capacitance", labels={'right': "V1", 'bottom': "V2",
                                                                                 'top': "V2", 'left': "V1"})
         self.w1autoLevels = True
@@ -148,7 +148,7 @@ class Sweep2DWidget(QtGui.QWidget):
         self.layout.addWidget(self.win1, *(0,0))
         self.layout.addWidget(self.chBx_autolevels1, *(1,0))
 
-        # self.dislayout = QtGui.QVBoxLayout(self)
+        # self.dislayout = QtWidgets.QVBoxLayout(self)
         self.view2 = pg.PlotItem(title="Dissipation", labels={'right': "V1", 'bottom': "V2",
                                                                                 'top': "V2", 'left': "V1"})
         
@@ -178,10 +178,10 @@ class Sweep2DWidget(QtGui.QWidget):
             pass
 
 
-class LineTraces(QtGui.QWidget):
+class LineTraces(QtWidgets.QWidget):
     def __init__(self, parent=None):
         super(LineTraces, self).__init__(parent)
-        self.layout = QtGui.QVBoxLayout(self)
+        self.layout = QtWidgets.QVBoxLayout(self)
         self.cap = pg.PlotWidget(title="Capacitance", labels={'left': "V1", 'bottom': "V2"})
         self.dis = pg.PlotWidget(title="Dissipation", labels={'left': "V1", 'bottom': "V2"}) 
         self.layout.addWidget(self.cap)
@@ -192,7 +192,7 @@ class LineTraces(QtGui.QWidget):
 
 
 if __name__=="__main__":
-    a = QtGui.QApplication( [] )
+    a = QtWidgets.QApplication( [] )
     import qt4reactor
     qt4reactor.install()
     from twisted.internet import reactor

@@ -3,7 +3,7 @@ import sys
 import os
 import os.path
 import twisted
-from PyQt5 import QtCore, QtGui, QtTest, uic
+from PyQt5 import QtCore, QtGui, QtWidgets, QtTest, uic
 from jinja2 import Environment, PackageLoader
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtPrintSupport import QPrinter
@@ -40,10 +40,10 @@ Ui_PlotSetup, QtBaseClass = uic.loadUiType(plotSetupUI)
 
 ID_NEWDATA = 999
 
-class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
+class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 	def __init__(self, reactor, parent = None):
 		super(dvPlotter, self).__init__(parent)
-		QtGui.QMainWindow.__init__(self)
+		QtWidgets.QMainWindow.__init__(self)
 		
 		self.setupUi(self)
 		self.reactor = reactor
@@ -292,10 +292,10 @@ class dvPlotter(QtGui.QMainWindow, Ui_MainWin):
 		self.reactor.callLater(secs,d.callback,'Sleeping')
 		return d
 
-class extentPrompt(QtGui.QDialog, Ui_ExtPrompt):
+class extentPrompt(QtWidgets.QDialog, Ui_ExtPrompt):
 	def __init__(self, reactor, plotInfo, x0, y0, parent = None):
 		super(extentPrompt, self).__init__(parent)
-		QtGui.QDialog.__init__(self)
+		QtWidgets.QDialog.__init__(self)
 		
 		self.reactor = reactor
 		self.plotInfo = plotInfo
@@ -394,7 +394,7 @@ class extentPrompt(QtGui.QDialog, Ui_ExtPrompt):
 	def closeEvent(self, e):
 		self.reject()
 
-class plot2DWindow(QtGui.QDialog):
+class plot2DWindow(QtWidgets.QDialog):
 	def __init__(self, reactor, plotInfo, dir, file, x0, y0, fresh, parent = None):
 		try: 
 			super(plot2DWindow, self).__init__(parent)
@@ -582,7 +582,7 @@ class plot2DWindow(QtGui.QDialog):
 		self.cxn.disconnect()
 		self.close()
 
-class plot1DWindow(QtGui.QDialog):
+class plot1DWindow(QtWidgets.QDialog):
 	def __init__(self, reactor, plotInfo, dir, file, x0, y0, fresh, parent = None):
 		super(plot1DWindow, self).__init__(parent)
 
@@ -663,11 +663,11 @@ class plot1DWindow(QtGui.QDialog):
 		
 		self.traceCntBox.currentIndexChanged.connect(self.alterColor)
 
-		self.plotTitleLbl = QtGui.QLabel()
+		self.plotTitleLbl = QtWidgets.QLabel()
 		self.plotTitleLbl.setText(self.plotTitle)
 		self.plotTitleLbl.setObjectName('plotTitleLbl')
 		self.plotTitleLbl.setStyleSheet("QLabel#plotTitleLbl {color: rgb(131,131,131); font: bold 11pt;}")
-		self.traceCntLbl = QtGui.QLabel()
+		self.traceCntLbl = QtWidgets.QLabel()
 		self.traceCntLbl.setText('Plot Previous Traces:')
 		self.traceCntLbl.setObjectName('traceCntLbl')
 		self.traceCntLbl.setStyleSheet("QLabel#traceCntLbl {color: rgb(131,131,131); font: 10pt;}")
@@ -811,7 +811,7 @@ class plot1DWindow(QtGui.QDialog):
 		self.cxn.disconnect()
 		self.close()
 
-class plotSaved1DWindow(QtGui.QWidget):
+class plotSaved1DWindow(QtWidgets.QWidget):
 	def __init__(self, reactor, file, dir, plotInfo, yMovePos, pencolor):
 		super(plotSaved1DWindow, self).__init__()
 
@@ -873,14 +873,14 @@ class plotSaved1DWindow(QtGui.QWidget):
 		self.openDVBtn.setToolTip('View data vault parameters and comments')
 		self.editNotesBtn.setToolTip('Edit plot notes')
 		
-		self.titleLbl = QtGui.QLabel()
+		self.titleLbl = QtWidgets.QLabel()
 
 		self.titleLbl.setObjectName('titleLbl')
 		self.titleLbl.setText(self.plotTitle)
 		self.titleLbl.setStyleSheet("QLabel#titleLbl {background-color: 'black';color: rgb(131,131,131); font: 11pt; }")
 		
-		self.saveLbl = QtGui.QLabel()
-		self.notesLbl = QtGui.QLabel()
+		self.saveLbl = QtWidgets.QLabel()
+		self.notesLbl = QtWidgets.QLabel()
 		self.saveLbl.setObjectName('saveLbl')
 		self.saveLbl.setText('Save Plot')
 		self.saveLbl.setStyleSheet("QLabel#saveLbl {background-color: 'black';color: rgb(131,131,131); font: 10pt; }")
@@ -982,11 +982,11 @@ class plotSaved1DWindow(QtGui.QWidget):
 		
 	def getSaveData(self, ext):
 		if ext == 'pdf':
-			fold = str(QtGui.QFileDialog.getSaveFileName(self, directory = os.getcwd(), filter = "PDF Document (*.pdf)"))
+			fold = str(QtWidgets.QFileDialog.getSaveFileName(self, directory = os.getcwd(), filter = "PDF Document (*.pdf)"))
 			if fold:
 				return fold
 		elif ext == 'mat':
-			fold = str(QtGui.QFileDialog.getSaveFileName(self, directory = os.getcwd(), filter = "MATLAB Data (*.mat)"))
+			fold = str(QtWidgets.QFileDialog.getSaveFileName(self, directory = os.getcwd(), filter = "MATLAB Data (*.mat)"))
 			if fold:
 				return fold		
 		
@@ -1094,7 +1094,7 @@ class plotSaved1DWindow(QtGui.QWidget):
 		if self.noteEdits.accepted:
 			self.notes = self.noteEdits.textEditor.toPlainText()
 		
-class plotSaved2DWindow(QtGui.QWidget):
+class plotSaved2DWindow(QtWidgets.QWidget):
 	def __init__(self, reactor, file, dir, plotInfo, yMovePos ):
 		super(plotSaved2DWindow, self).__init__()
 
@@ -1166,7 +1166,7 @@ class plotSaved2DWindow(QtGui.QWidget):
 		self.xySelectBox.insertItem(1, 'Vertical')
 		self.xySelectBox.currentIndexChanged.connect(self.toggleXYTrace)
 		
-		self.xySelectLbl = QtGui.QLabel()
+		self.xySelectLbl = QtWidgets.QLabel()
 		self.xySelectLbl.setObjectName('xySelectLbl')
 		self.xySelectLbl.setText('Line Cut Direction:')
 		self.xySelectLbl.setStyleSheet('QLabel#xySelectLbl {color: rgb(131,131,131); font: 10pt;}')
@@ -1175,7 +1175,7 @@ class plotSaved2DWindow(QtGui.QWidget):
 		self.xySelectBox.setItemData(0, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
 		self.xySelectBox.setItemData(1, QtGui.QColor('black'), QtCore.Qt.BackgroundRole)
 		
-		self.tracePosLbl = QtGui.QLabel()
+		self.tracePosLbl = QtWidgets.QLabel()
 		self.tracePosLbl.setObjectName('tracePosLbl')
 		self.tracePosLbl.setText('Line Cut Position:')
 		self.tracePosLbl.setStyleSheet('QLabel#tracePosLbl {color: rgb(131,131,131); font: 10pt;}')
@@ -1196,18 +1196,18 @@ class plotSaved2DWindow(QtGui.QWidget):
 		self.backBtn = QtGui.QPushButton()
 		self.backBtn1 = QtGui.QPushButton()
 		
-		self.saveMatMenu = QtGui.QMenu()
-		save1D = QtGui.QAction("Save 1D trace", self)
-		save2D = QtGui.QAction("Save 2D plot", self)
+		self.saveMatMenu = QtWidgets.QMenu()
+		save1D = QtWidgets.QAction("Save 1D trace", self)
+		save2D = QtWidgets.QAction("Save 2D plot", self)
 		save1D.triggered.connect(self.save1DMAT)
 		save2D.triggered.connect(self.save2DMAT)
 		self.saveMatMenu.addAction(save2D)
 		self.saveMatMenu.addAction(save1D)
 		self.saveMATBtn.setMenu(self.saveMatMenu)
 		
-		self.savePDFMenu = QtGui.QMenu()
-		pdf1D = QtGui.QAction("Save 1D trace", self)
-		pdf2D = QtGui.QAction("Save 2D plot", self)
+		self.savePDFMenu = QtWidgets.QMenu()
+		pdf1D = QtWidgets.QAction("Save 1D trace", self)
+		pdf2D = QtWidgets.QAction("Save 2D plot", self)
 		pdf1D.triggered.connect(lambda: self.savePDF(1))
 		pdf2D.triggered.connect(lambda: self.savePDF(2))
 		self.savePDFMenu.addAction(pdf2D)
@@ -1221,8 +1221,8 @@ class plotSaved2DWindow(QtGui.QWidget):
 		self.openDVBtn.setToolTip('View data vault parameters and comments')
 		self.editNotesBtn.setToolTip('Edit plot notes')
 		
-		self.saveLbl = QtGui.QLabel()
-		self.notesLbl = QtGui.QLabel()
+		self.saveLbl = QtWidgets.QLabel()
+		self.notesLbl = QtWidgets.QLabel()
 		self.saveLbl.setObjectName('saveLbl')
 		self.saveLbl.setText('Save Plot')
 		self.saveLbl.setStyleSheet("QLabel#saveLbl {background-color: 'black';color: rgb(131,131,131); font: 10pt; }")
@@ -1460,11 +1460,11 @@ class plotSaved2DWindow(QtGui.QWidget):
 			
 	def getSaveData(self, ext):
 		if ext == 'pdf':
-			fold = str(QtGui.QFileDialog.getSaveFileName(self, directory = os.getcwd(), filter = "PDF Document (*.pdf)"))
+			fold = str(QtWidgets.QFileDialog.getSaveFileName(self, directory = os.getcwd(), filter = "PDF Document (*.pdf)"))
 			if fold:
 				return fold
 		elif ext == 'mat':
-			fold = str(QtGui.QFileDialog.getSaveFileName(self, directory = os.getcwd(), filter = "MATLAB Data (*.mat)"))
+			fold = str(QtWidgets.QFileDialog.getSaveFileName(self, directory = os.getcwd(), filter = "MATLAB Data (*.mat)"))
 			if fold:
 				return fold
 
@@ -1611,7 +1611,7 @@ class plotSaved2DWindow(QtGui.QWidget):
 		if self.noteEdits.accepted:
 			self.notes = self.noteEdits.textEditor.toPlainText()
 
-class noteEditor(QtGui.QDialog):
+class noteEditor(QtWidgets.QDialog):
 	def __init__(self, notes):
 		super(noteEditor, self).__init__()
 		self.notes = notes
@@ -1644,10 +1644,10 @@ class noteEditor(QtGui.QDialog):
 		self.reject()
 		self.close()
 
-class LineNumberArea(QtGui.QWidget):
+class LineNumberArea(QtWidgets.QWidget):
 
 	def __init__(self, editor):
-		super(QtGui.QWidget, self).__init__(editor)
+		super(QtWidgets.QWidget, self).__init__(editor)
 		self.myeditor = editor
 
 	def sizeHint(self):
@@ -1656,9 +1656,9 @@ class LineNumberArea(QtGui.QWidget):
 	def paintEvent(self, event):
 		self.myeditor.lineNumberAreaPaintEvent(event)
 
-class textEditor(QtGui.QPlainTextEdit):
+class textEditor(QtWidgets.QPlainTextEdit):
 	def __init__(self, parent = None):
-		super(QtGui.QPlainTextEdit, self).__init__(parent)
+		super(QtWidgets.QPlainTextEdit, self).__init__(parent)
 		
 		self.lineNumberArea = LineNumberArea(self)
 
@@ -1693,7 +1693,7 @@ class textEditor(QtGui.QPlainTextEdit):
 
 
 	def resizeEvent(self, event):
-		super(QtGui.QPlainTextEdit, self).resizeEvent(event)
+		super(QtWidgets.QPlainTextEdit, self).resizeEvent(event)
 
 		cr = self.contentsRect();
 		self.lineNumberArea.setGeometry(QtCore.QRect(cr.left(), cr.top(),
@@ -1728,7 +1728,7 @@ class textEditor(QtGui.QPlainTextEdit):
 		extraSelections = []
 
 		if not self.isReadOnly():
-			selection = QtGui.QTextEdit.ExtraSelection()
+			selection = QtWidgets.QTextEdit.ExtraSelection()
 
 			#TODO Edit color
 			lineColor = QtGui.QColor(QtCore.Qt.yellow).lighter(160)
@@ -1740,7 +1740,7 @@ class textEditor(QtGui.QPlainTextEdit):
 			extraSelections.append(selection)
 		self.setExtraSelections(extraSelections)
 
-class plotSetup(QtGui.QDialog, Ui_PlotSetup):
+class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 	def __init__(self, reactor, file, dir, cxn, dv, fresh, parent = None):
 		#Fresh numbers
 		#0 comes from listener
@@ -1748,7 +1748,7 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 		#2 comes from saved
 		
 		super(plotSetup, self).__init__(parent)
-		QtGui.QDialog.__init__(self)
+		QtWidgets.QDialog.__init__(self)
 
 		self.reactor = reactor
 		self.file = str(file)
@@ -2154,10 +2154,10 @@ class plotSetup(QtGui.QDialog, Ui_PlotSetup):
 		print('closing the window')
 		self.close()
 
-class dirExplorer(QtGui.QDialog, Ui_DirExp):
+class dirExplorer(QtWidgets.QDialog, Ui_DirExp):
 	def __init__(self, reactor, status, parent = None):
 		super(dirExplorer, self).__init__(parent)
-		QtGui.QDialog.__init__(self)
+		QtWidgets.QDialog.__init__(self)
 
 		self.reactor = reactor
 		self.setupUi(self)
@@ -2247,7 +2247,7 @@ class dirExplorer(QtGui.QDialog, Ui_DirExp):
 
 	@inlineCallbacks
 	def makeDir(self, c = None):
-		direct, ok = QtGui.QInputDialog.getText(self, "Make directory", "Directory Name: " )
+		direct, ok = QtWidgets.QInputDialog.getText(self, "Make directory", "Directory Name: " )
 		if ok:
 			yield self.dv.mkdir(str(direct))
 			yield self.popDirs(self.reactor)
@@ -2280,10 +2280,10 @@ class dirExplorer(QtGui.QDialog, Ui_DirExp):
 		else:
 			self.mainWin.changeDir.setEnabled(True)
 
-class dataVaultExplorer(QtGui.QDialog, Ui_DataVaultExp):
+class dataVaultExplorer(QtWidgets.QDialog, Ui_DataVaultExp):
 	def __init__(self, reactor, source, listenDir, parent = None):
 		super(dataVaultExplorer, self).__init__(parent)
-		QtGui.QDialog.__init__(self)
+		QtWidgets.QDialog.__init__(self)
 
 		self.reactor = reactor
 		self.source = source
@@ -2373,7 +2373,7 @@ class dataVaultExplorer(QtGui.QDialog, Ui_DataVaultExp):
 
 	@inlineCallbacks
 	def makeDir(self, c = None):
-		direct, ok = QtGui.QInputDialog.getText(self, "Make directory", "Directory Name: " )
+		direct, ok = QtWidgets.QInputDialog.getText(self, "Make directory", "Directory Name: " )
 		if ok:
 			yield self.dv.mkdir(str(direct))
 			yield self.popDirs(None, self.reactor)
@@ -2418,7 +2418,7 @@ class dataVaultExplorer(QtGui.QDialog, Ui_DataVaultExp):
 
 if __name__ == "__main__":
 	global app
-	app = QtGui.QApplication([])
+	app = QtWidgets.QApplication([])
 	import qt5reactor as pyqt5reactor
 	pyqt5reactor.install()
 	from twisted.internet import reactor
