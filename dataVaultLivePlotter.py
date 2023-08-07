@@ -321,16 +321,16 @@ class extentPrompt(QtWidgets.QDialog, Ui_ExtPrompt):
 		self.extTable.setColumnCount(4)
 		self.extTable.setRowCount(len(self.plotInfo) + 1)
 
-		min, max, pts = QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem(), 
+		min, max, pts = QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), 
 		
 		headers = [min, max, pts]
 		
 		min.setText('Minimum Value')		
-		min.setTextColor(QtGui.QColor(131,131,131))
+		min.setForeground(QtGui.QColor(131,131,131))
 		max.setText('Maximum Value')
-		max.setTextColor(QtGui.QColor(131,131,131))
+		max.setForeground(QtGui.QColor(131,131,131))
 		pts.setText('Number of Points')
-		pts.setTextColor(QtGui.QColor(131,131,131))
+		pts.setForeground(QtGui.QColor(131,131,131))
 
 		for ii in range(0, 3):
 			self.extTable.setItem(0, ii+1, headers[ii])
@@ -343,16 +343,16 @@ class extentPrompt(QtWidgets.QDialog, Ui_ExtPrompt):
 		self.extTable.setColumnWidth(3, 125)
 		
 		for ii in range(0, len(self.plotInfo)):
-			item = QtGui.QTableWidgetItem()
+			item = QtWidgets.QTableWidgetItem()
 			item.setText(self.plotInfo[ii])
 			item.setFont(QtGui.QFont("MS Shell Dlg 2",weight=QtGui.QFont.Bold))
 			self.extTable.setItem(ii+1, 0, item)
 			self.extTable.item(ii+1, 0).setFlags(QtCore.Qt.NoItemFlags)
 		for r in range(1, len(self.plotInfo) + 1):
 			for c in range(1, 4):
-				item = QtGui.QTableWidgetItem()
+				item = QtWidgets.QTableWidgetItem()
 				self.extTable.setItem(r, c, item)
-				self.extTable.item(r, c).setBackgroundColor(QtGui.QColor(255,255,255))
+				self.extTable.item(r, c).setBackground(QtGui.QColor(255,255,255))
 
 	def moveDefault(self):
 		self.move(self.x0, self.y0)
@@ -363,7 +363,7 @@ class extentPrompt(QtWidgets.QDialog, Ui_ExtPrompt):
 		
 		for r in range(1, len(self.plotInfo) + 1):
 			for c in range(1, 4):
-				self.extTable.item(r, c).setBackgroundColor(QtGui.QColor(255,255,255))
+				self.extTable.item(r, c).setBackground(QtGui.QColor(255,255,255))
 		
 		for r in range(1, self.extTable.rowCount()):
 			try:
@@ -496,7 +496,7 @@ class plot2DWindow(QtWidgets.QDialog):
 			p.setColor(self.backgroundRole(), QtGui.QColor(0, 0, 0))
 			self.setPalette(p)
 		
-			self.layout = QtGui.QGridLayout(self)
+			self.layout = QtWidgets.QGridLayout(self)
 			
 			self.viewBig = pg.PlotItem(name = "Plot", title = self.plotTitle)
 			self.viewBig.showAxis('top', show = True)
@@ -627,7 +627,7 @@ class plot1DWindow(QtWidgets.QDialog):
 		p.setColor(self.backgroundRole(), QtGui.QColor(0, 0, 0))
 		self.setPalette(p)
 	
-		self.layout = QtGui.QGridLayout(self)
+		self.layout = QtWidgets.QGridLayout(self)
 		
 		self.plot1D = pg.PlotWidget()
 		self.plot1D.showAxis('right', show = True)
@@ -637,7 +637,7 @@ class plot1DWindow(QtWidgets.QDialog):
 		self.plot1D.enableAutoRange(enable = True)
 
 		
-		self.traceCntBox = QtGui.QComboBox()
+		self.traceCntBox = QtWidgets.QComboBox()
 		self.traceCntBox.setObjectName('traceCntBox')
 		
 
@@ -846,7 +846,7 @@ class plotSaved1DWindow(QtWidgets.QWidget):
 		p.setColor(self.backgroundRole(), QtGui.QColor(0, 0, 0))
 		self.setPalette(p)
 
-		self.layout = QtGui.QGridLayout(self)
+		self.layout = QtWidgets.QGridLayout(self)
 		
 		
 		self.plot1D = pg.PlotWidget()
@@ -1125,7 +1125,7 @@ class plotSaved2DWindow(QtWidgets.QWidget):
 		p.setColor(self.backgroundRole(), QtGui.QColor(0, 0, 0))
 		self.setPalette(p)
 
-		self.layout = QtGui.QGridLayout(self)
+		self.layout = QtWidgets.QGridLayout(self)
 		
 		self.viewBig = pg.PlotItem(name = "Plot 2D", title = self.plotTitle)
 		self.viewBig.showAxis('top', show = True)
@@ -1159,7 +1159,7 @@ class plotSaved2DWindow(QtWidgets.QWidget):
 		self.plot1D.setLabel('bottom', self.xAxis)
 		self.plot1D.enableAutoRange(enable = True)
 		
-		self.xySelectBox = QtGui.QComboBox()
+		self.xySelectBox = QtWidgets.QComboBox()
 		self.xySelectBox.setObjectName('xySelectBox')
 		self.xySelectBox.setStyleSheet("QComboBox#xySelectBox{width: 20px; color: rgb(131,131,131); background-color: 'balck';	border: 2px solid rgb(131,131,131); border-radius: 5px;}")
 		self.xySelectBox.insertItem(0, 'Horizontal')
@@ -1631,7 +1631,7 @@ class noteEditor(QtWidgets.QDialog):
 		self.okBtn.setStyleSheet("QPushButton#okBtn {color:rgb(131,131,131);background-color:black;border: 2px solid rgb(131,131,131);border-radius: 5px; width: 25px; font: 11pt}")
 		self.okBtn.clicked.connect(self.closeEdit)
 
-		self.layout = QtGui.QGridLayout(self)
+		self.layout = QtWidgets.QGridLayout(self)
 		self.layout.addWidget(self.textEditor, *(0, 0))
 		self.layout.addWidget(self.okBtn, *(1, 0), alignment = QtCore.Qt.AlignHCenter)
 		self.setLayout(self.layout)
@@ -1846,31 +1846,31 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 		
 		self.onePlots.insertRow(0)
 		self.twoPlots.insertRow(0)
-		num1, num2, lbl1, lbl2, x1, y1, x2, y2, z2 = QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem()
+		num1, num2, lbl1, lbl2, x1, y1, x2, y2, z2 = QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem()
 		
 		headers = [lbl1, x1, y1, lbl2, x2, y2, z2]
 		
 		num1.setText('Plot')
-		num1.setTextColor(QtGui.QColor(131,131,131))
+		num1.setForeground(QtGui.QColor(131,131,131))
 		num2.setText('Plot')
-		num2.setTextColor(QtGui.QColor(131,131,131))
+		num2.setForeground(QtGui.QColor(131,131,131))
 		
 		lbl1.setText('Plot Title')
-		lbl1.setTextColor(QtGui.QColor(131,131,131))
+		lbl1.setForeground(QtGui.QColor(131,131,131))
 		lbl2.setText('Plot Title')
-		lbl2.setTextColor(QtGui.QColor(131,131,131))
+		lbl2.setForeground(QtGui.QColor(131,131,131))
 		
 		x1.setText('X Axis')
-		x1.setTextColor(QtGui.QColor(131,131,131))
+		x1.setForeground(QtGui.QColor(131,131,131))
 		y1.setText('Y Axis')
-		y1.setTextColor(QtGui.QColor(131,131,131))
+		y1.setForeground(QtGui.QColor(131,131,131))
 		
 		x2.setText('X Axis')
-		x2.setTextColor(QtGui.QColor(131,131,131))
+		x2.setForeground(QtGui.QColor(131,131,131))
 		y2.setText('Y Axis')
-		y2.setTextColor(QtGui.QColor(131,131,131))
+		y2.setForeground(QtGui.QColor(131,131,131))
 		z2.setText('Z Axis')
-		z2.setTextColor(QtGui.QColor(131,131,131))
+		z2.setForeground(QtGui.QColor(131,131,131))
 		
 		for ii in range(0, 3):
 			self.onePlots.setItem(0, ii, headers[ii])
@@ -1897,7 +1897,7 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 				for r in range(0, self.onePlots.rowCount()):
 					if self.onePlots.item(r, c) != None:
 						self.onePlots.item(r, c).setBackground(QtGui.QColor(0,0,0))
-						self.onePlots.item(r, c).setTextColor(QtGui.QColor(131,131,131))
+						self.onePlots.item(r, c).setForeground(QtGui.QColor(131,131,131))
 						if c != 0:
 							self.onePlots.item(r, c).setFlags(QtCore.Qt.NoItemFlags)
 						elif c == 0 and r != 0:
@@ -1905,14 +1905,14 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 							item = self.onePlots.item(r, c)
 							if item.text() == '':
 								item.setText(self.backtext1)
-							item.setBackgroundColor(QtGui.QColor(100,100,150))
-							item.setTextColor(QtGui.QColor(0,0,0))
+							item.setBackground(QtGui.QColor(100,100,150))
+							item.setForeground(QtGui.QColor(0,0,0))
 		elif num ==2:
 			for c in range(0, 4):
 				for r in range(0, self.twoPlots.rowCount()):
 					if self.twoPlots.item(r, c) != None:
 						self.twoPlots.item(r, c).setBackground(QtGui.QColor(0,0,0))
-						self.twoPlots.item(r, c).setTextColor(QtGui.QColor(131,131,131))	
+						self.twoPlots.item(r, c).setForeground(QtGui.QColor(131,131,131))	
 						if c != 0:
 							self.twoPlots.item(r, c).setFlags(QtCore.Qt.NoItemFlags)
 						elif c == 0 and r != 0:
@@ -1920,14 +1920,14 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 							item = self.twoPlots.item(r, c)
 							if item.text() == '':
 								item.setText(self.backtext2)
-							item.setBackgroundColor(QtGui.QColor(100,100,150))
-							item.setTextColor(QtGui.QColor(0,0,0))
+							item.setBackground(QtGui.QColor(100,100,150))
+							item.setForeground(QtGui.QColor(0,0,0))
 		else:
 			pass
 		self.formFlag = True
 		
 	def add1DPlot(self):
-		lbl, xAx, yAx = QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem()
+		lbl, xAx, yAx = QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem()
 		self.onePlots.insertRow(self.onePlots.rowCount())
 		
 		self.num1Plots += 1
@@ -1953,7 +1953,7 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 		self.formatTable(1)
 		
 	def add2DPlot(self):
-		lbl, xAx, yAx, zAx = QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem(), QtGui.QTableWidgetItem()
+		lbl, xAx, yAx, zAx = QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem()
 		self.twoPlots.insertRow(self.twoPlots.rowCount())
 		
 		self.num2Plots += 1
@@ -2203,10 +2203,12 @@ class dirExplorer(QtWidgets.QDialog, Ui_DirExp):
 		l = yield self.dv.dir()
 		for i in l[0]:
 			self.dirList.addItem(i)
-			self.dirList.item(self.dirList.count() - 1).setTextColor(QtGui.QColor(131,131,131))
+			# self.dirList.item(self.dirList.count() - 1).setTextColor(QtGui.QColor(131,131,131))
+			self.dirList.item(self.dirList.count() - 1).setForeground(QtGui.QColor(131,131,131))
 		for i in l[1]:
 			self.fileList.addItem(i)
-			self.fileList.item(self.fileList.count() - 1).setTextColor(QtGui.QColor(131,131,131))
+			# self.fileList.item(self.fileList.count() - 1).setTextColor(QtGui.QColor(131,131,131))
+			self.fileList.item(self.fileList.count() - 1).setForeground(QtGui.QColor(131,131,131))
 		if self.currentDir[-1] == '':
 			
 			self.dirName.setText('Root')
@@ -2333,10 +2335,10 @@ class dataVaultExplorer(QtWidgets.QDialog, Ui_DataVaultExp):
 		l = yield self.dv.dir()
 		for i in l[0]:
 			self.dirList.addItem(i)
-			self.dirList.item(self.dirList.count() - 1).setTextColor(QtGui.QColor(131,131,131))
+			self.dirList.item(self.dirList.count() - 1).setForeground(QtGui.QColor(131,131,131))
 		for i in l[1]:
 			self.fileList.addItem(i)
-			self.fileList.item(self.fileList.count() - 1).setTextColor(QtGui.QColor(131,131,131))
+			self.fileList.item(self.fileList.count() - 1).setForeground(QtGui.QColor(131,131,131))
 		if self.currentDir[-1] == '':
 			
 			self.dirName.setText('Root')
