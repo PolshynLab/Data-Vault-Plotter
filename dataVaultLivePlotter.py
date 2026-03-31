@@ -18,6 +18,7 @@ import copy
 import datetime as dt
 import scipy.io as sio
 import scipy.stats as spst
+from pyqtgraph.graphicsItems.GradientEditorItem import Gradients
 
 path = sys.path[0]
 
@@ -44,7 +45,7 @@ class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 	def __init__(self, reactor, parent = None):
 		super(dvPlotter, self).__init__(parent)
 		QtWidgets.QMainWindow.__init__(self)
-		
+		print("\n called dvPlotter \n")
 		self.setupUi(self)
 		self.reactor = reactor
 		
@@ -70,10 +71,12 @@ class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 		self.listenTo = ['']
 		
 	def moveDefault(self):
+		print("\n called moveDefault \n")
 		self.move(25,25)
 		
 	@inlineCallbacks
 	def initReact(self, c):
+		print("\n called initReact \n")
 		from labrad.wrappers import connectAsync
 		try:
 			self.cxn = yield connectAsync(name = 'dvPlotter')
@@ -85,6 +88,7 @@ class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 		
 	@inlineCallbacks
 	def initListener(self, c):
+		print("\n called initListener \n")
 		if self.listStatus == False:
 			self.listen.clicked.disconnect()
 			self.changeDir.clicked.connect(self.setupListener)
@@ -120,15 +124,18 @@ class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 		
 	@inlineCallbacks
 	def open_dataset(self, c, signal):
+		print("\n called open_dataset \n")
 		print('signal: ', signal)
 		self.listenPlotFile =  signal
 		yield self.dv.open(str(self.listenPlotFile))
 		yield self.sleep(0.5)
 		params = yield self.dv.get_parameters()
+		#print(params) #for debugging purposes
 		vars = yield self.dv.variables()
-		if params != None:
+		if  params != None:
 			params = dict((x,y) for x,y in params)	
 			parKeys = list(params.keys())
+			#print("\n\n\n",parKeys) #for debugging
 			if 'live_plots' in parKeys:
 				print('init live plots')
 				self.initLivePlotting(params, vars)
@@ -143,11 +150,12 @@ class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 			
 	@inlineCallbacks
 	def initLivePlotting(self, params, vars, c = None):
+		print("\n called initLivePlotting \n")
 		print('Live Plots: ', params['live_plots'])
 		plot1DDict, plot2DDict = {}, {}
 		missingInfo = False
 		toPlot = params['live_plots']
-		print('To Plot: ', toPlot)
+		#print('\n\n Bruh! \n\n To Plot \n\n: ', toPlot)
 		indVars, depVars = [x[0] for x in vars[0]], [x[0] for x in vars[1]]
 		print('Varialbes: ', vars)
 		for plot in toPlot:
@@ -164,15 +172,26 @@ class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 					missingInfo = True
 			elif len(plot) == 3:
 				try:
-					title = str(plot[2]) + ' vs. ' + str(plot[0]) + ' and ' + str(plot[1])
-					x_axis, y_axis, z_axis = str(plot[0]), str(plot[1]), str(plot[2])
-					x_index, y_index, z_index = indVars.index(x_axis), indVars.index(y_axis), depVars.index(z_axis)+len(indVars)
-					x_rng = params[x_axis + '_rng']
-					x_pnts = params[x_axis + '_pnts']
-					y_rng = params[y_axis + '_rng']
-					y_pnts = params[y_axis + '_pnts']
-					plot2DDict[title] = {'title' : title, 'x axis' : x_axis, 'y axis' : y_axis, 'z axis' : z_axis, 'x index' : x_index, 'y index' : y_index, 'z index' : z_index , 'x range' : x_rng, 'x points' : x_pnts, 'y range' : y_rng, 'y points' : y_pnts}
-					print(title)
+					if self.oIndex == 4:
+						title = str(plot[2]) + ' vs. ' + str(plot[0]) + ' and ' + str(plot[1])
+						x_axis, y_axis, z_axis = str(plot[0]), str(plot[1]), str(plot[2])
+						x_index, y_index, z_index = indVars.index(x_axis), indVars.index(y_axis), depVars.index(z_axis)+len(indVars)
+						x_rng = params[x_axis + '_rng']
+						x_pnts = params[x_axis + '_pnts']
+						y_rng = params[y_axis + '_rng']
+						y_pnts = params[y_axis + '_pnts']
+						plot2DDict[title] = {'title' : title, 'x axis' : x_axis, 'y axis' : y_axis, 'z axis' : z_axis, 'x index' : x_index, 'y index' : y_index, 'z index' : z_index , 'x range' : x_rng, 'x points' : x_pnts, 'y range' : y_rng, 'y points' : y_pnts}
+						print(title)
+					else:
+						title = str(plot[2]) + ' vs. ' + str(plot[0]) + ' and ' + str(plot[1])
+						x_axis, y_axis, z_axis = str(plot[0]), str(plot[1]), str(plot[2])
+						x_index, y_index, z_index = indVars.index(x_axis), indVars.index(y_axis), depVars.index(z_axis)+len(indVars)
+						x_rng = params[x_axis + '_rng']
+						x_pnts = params[x_axis + '_pnts']
+						y_rng = params[y_axis + '_rng']
+						y_pnts = params[y_axis + '_pnts']
+						plot2DDict[title] = {'title' : title, 'x axis' : x_axis, 'y axis' : y_axis, 'z axis' : z_axis, 'x index' : x_index, 'y index' : y_index, 'z index' : z_index , 'x range' : x_rng, 'x points' : x_pnts, 'y range' : y_rng, 'y points' : y_pnts}
+						print(title)
 				except:
 					missingInfo = True
 			else:
@@ -202,6 +221,7 @@ class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 		
 	@inlineCallbacks
 	def openLivePlots(self, twoPlots, onePlots, fresh, c = None):
+		print("\n called openLivePlots \n")
 		try: 
 			x0, y0 = 450, 25
 			for plot in twoPlots:
@@ -223,6 +243,7 @@ class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 		self.allowPlot = True
 			
 	def openSavedPlots(self, file, dir, allPlots, dim):
+		print("\n called openSavedPlots \n")
 		color0 = 0
 		x0, y0 = 450, 25
 		if dim == 2:
@@ -253,8 +274,9 @@ class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 					print(sys.exc_traceback.tb_lineno) 						
 
 	def plotLiveData(self):
+		print("\n called PlotLiveData \n")
 		self.dvExplorer = dataVaultExplorer(self.reactor, 'live', self.listenTo, self)
-		print('opening liver')
+		print('opening live')
 		self.dvExplorer.show()
 		
 	def setupListener(self):
@@ -296,7 +318,7 @@ class extentPrompt(QtWidgets.QDialog, Ui_ExtPrompt):
 	def __init__(self, reactor, plotInfo, x0, y0, parent = None):
 		super(extentPrompt, self).__init__(parent)
 		QtWidgets.QDialog.__init__(self)
-		
+		print("\n called",self," \n")
 		self.reactor = reactor
 		self.plotInfo = plotInfo
 		self.mainWin = parent
@@ -406,10 +428,14 @@ class plot2DWindow(QtWidgets.QDialog):
 			#fresh specifies if the dataset to be plotted already has data (1) or is empty (0)
 			self.fresh = fresh
 			
-			self.xIndex = self.plotInfo['x index']
-			self.yIndex = self.plotInfo['y index']
-			self.zIndex = self.plotInfo['z index']
-			
+			self.xIndex = a = self.plotInfo['x index']
+			self.yIndex = b = self.plotInfo['y index']
+			self.zIndex = c = self.plotInfo['z index']
+			self.oIndex = d = 3-self.plotInfo['operation index']
+			self.z2Index = e = self.plotInfo['z index 2']
+			self.gval = f = self.plotInfo['gval']
+			#print(a,b,c,d,e) #for debuging
+			print("\n\n",d,"\n\n")
 			print('------------------------------')
 			print('Plot parameters: ')
 			print(file)
@@ -422,7 +448,16 @@ class plot2DWindow(QtWidgets.QDialog):
 			self.pxsize = [self.plotInfo['x points'], self.plotInfo['y points']]
 			self.plotTitle = self.plotInfo['title']
 			if self.plotTitle[0:5] == 'Plot ':
-				self.plotTitle = self.plotInfo['z axis'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis']		
+				if self.gval == -1:
+					if self.z2Index == 0:
+						self.plotTitle = self.plotInfo['z axis'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis']
+					else: 
+						self.plotTitle = self.plotInfo['z axis'] + self.plotInfo['operation'] + self.plotInfo['z axis 2'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis']
+				else:
+					if self.z2Index == 0:
+						self.plotTitle = self.plotInfo['z axis'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis'] + ", gain = "+ str(self.plotInfo['gval'])
+					else: 
+						self.plotTitle = self.plotInfo['z axis'] + self.plotInfo['operation'] + self.plotInfo['z axis 2'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis'] + ", gain = "+ str(self.plotInfo['gval'])	
 			self.setWindowTitle(self.plotTitle)
 
 			self.Data = np.array([])
@@ -440,7 +475,8 @@ class plot2DWindow(QtWidgets.QDialog):
 		
 	@inlineCallbacks
 	def setupListener(self, c):
-		try: 
+		try:
+			print("setupListener called!")
 			cxnName = 'plot' + str(self.id)
 			from labrad.wrappers import connectAsync
 			self.cxn = yield connectAsync(name = cxnName)
@@ -452,25 +488,97 @@ class plot2DWindow(QtWidgets.QDialog):
 			newData = yield self.dv.get()
 			print('New Data: ', newData[0])
 			print('Length: ', len(newData))
-
+			print(self.plotInfo)
 			if len(newData[0]) != 0:
-				inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex])
-				newData = np.delete(np.asarray(newData), inx, axis = 1)
-				x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.xIndex)[0][0]
-				y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.yIndex)[0][0]
-				z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.zIndex)[0][0]
-				newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
-				print(newData[::, x_ind])
-				newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
+				if self.gval == -1:
+					if self.z2Index == 0:
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.yIndex)[0][0]
+						z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.zIndex)[0][0]
+						newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
+						print(newData[::, x_ind])
+						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
 
-				for pt in newData:
-					self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]
-				
-				self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
-				self.isData = True
+						for pt in newData:
+							self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]
+						
+						self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+						self.isData = True
+					else:
+						self.z2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex, self.z2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.yIndex)[0][0]
+						z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.zIndex)[0][0]
+						z2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.z2Index)[0][0]
+						newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
+						print(newData[::, x_ind])
+						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
-			
+
+						for pt in newData:
+							if self.oIndex == 0:
+								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]+pt[z2_ind]
+							elif self.oIndex == 1:
+								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]-pt[z2_ind]
+							elif self.oIndex == 2:
+								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]*pt[z2_ind]
+							elif self.oIndex == 3:
+								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = np.divide(pt[z_ind], pt[z2_ind], out=np.zeros_like(pt[z_ind], dtype=float), where=pt[z2_ind]!=0)
+							else:
+								pass
+						self.z2Index +=1
+						self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+						self.isData = True
+				else: 
+					if self.z2Index == 0:
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.yIndex)[0][0]
+						z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.zIndex)[0][0]
+						newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
+						print(newData[::, x_ind])
+						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
+
+
+						for pt in newData:
+							self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]*self.gval
+						
+						self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+						self.isData = True
+					else:
+						self.z2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex, self.z2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.yIndex)[0][0]
+						z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.zIndex)[0][0]
+						z2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.z2Index)[0][0]
+						newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
+						print(newData[::, x_ind])
+						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
+
+
+						for pt in newData:
+							if self.oIndex == 0:
+								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (pt[z_ind]+pt[z2_ind])*self.gval
+							elif self.oIndex == 1:
+								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (pt[z_ind]-pt[z2_ind])*self.gval
+							elif self.oIndex == 2:
+								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (pt[z_ind]*pt[z2_ind])*self.gval
+							elif self.oIndex == 3:
+								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (np.divide(pt[z_ind], pt[z2_ind], out=np.zeros_like(pt[z_ind], dtype=float), where=pt[z2_ind]!=0))*self.gval
+							else:
+								pass
+						self.z2Index +=1
+						self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+						self.isData = True	
+			print(self.plotInfo)
 		except Exception as inst:
 			print('Following error was thrown: ')
 			print(inst)
@@ -506,7 +614,7 @@ class plot2DWindow(QtWidgets.QDialog):
 			self.viewBig.setAspectLocked(lock = False, ratio = 1)
 			self.mainPlot = pg.ImageView(view = self.viewBig)
 			self.mainPlot.ui.menuBtn.hide()
-			self.mainPlot.ui.histogram.item.gradient.loadPreset('bipolar')
+			self.mainPlot.ui.histogram.item.gradient.loadPreset('inferno')
 			self.mainPlot.ui.roiBtn.hide()
 			self.mainPlot.ui.menuBtn.hide()
 			self.viewBig.setAspectLocked(False)
@@ -516,11 +624,10 @@ class plot2DWindow(QtWidgets.QDialog):
 
 			self.layout.addWidget(self.mainPlot, *(0,0))
 			self.setLayout(self.layout)
-			
 			self.plotData = np.zeros([self.pxsize[0], self.pxsize[1]])
 			
 			self.xscale, self.yscale = np.absolute((self.extents[1] - self.extents[0])/self.pxsize[0]), np.absolute((self.extents[3] - self.extents[2])/self.pxsize[1])
-			self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+			self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 			
 			if self.extents[0] < self.extents[1]:
 				self.xBins = np.linspace(self.extents[0] - 0.5 * self.xscale, self.extents[1] + 0.5 * self.xscale, self.pxsize[0]+1)
@@ -547,26 +654,199 @@ class plot2DWindow(QtWidgets.QDialog):
 	
 	@inlineCallbacks	
 	def updatePlot(self, c, signal):
-
+		print("\nupdatePlot initiated\n")
 		try: 
 			newData = yield self.dv.get()
-			if len(newData) != 0:
-				inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex])
-				newData = np.delete(np.asarray(newData), inx, axis = 1)
-				
-				x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.xIndex)[0][0]
-				y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.yIndex)[0][0]
-				z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.zIndex)[0][0]
+			start = time.time()
+			print(start)
+			if len(newData[0]) != 0:
+				if self.gval == -1:
+					if self.z2Index == 0:
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.yIndex)[0][0]
+						z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.zIndex)[0][0]
+						newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
+						print(newData[::, x_ind])
+						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
-				newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins)-1
-				newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins)-1
-				yield self.plotMore(newData, x_ind, y_ind, z_ind, self.reactor)
+
+						for pt in newData:
+							self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]
+						yield self.sleep(0.1)
+						self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+						self.isData = True
+					else:
+						self.z2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex, self.z2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.yIndex)[0][0]
+						z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.zIndex)[0][0]
+						z2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.z2Index)[0][0]
+						newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
+						print(newData[::, x_ind])
+						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
+
+
+						for pt in newData:
+							if self.oIndex == 0:
+								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]+pt[z2_ind]
+							elif self.oIndex == 1:
+								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]-pt[z2_ind]
+							elif self.oIndex == 2:
+								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]*pt[z2_ind]
+							elif self.oIndex == 3:
+								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = np.divide(pt[z_ind], pt[z2_ind], out=np.zeros_like(pt[z_ind], dtype=float), where=pt[z2_ind]!=0)
+							else:
+								pass
+						yield self.sleep(0.1)
+						self.z2Index +=1
+						self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+						self.isData = True
+				else: 
+					if self.z2Index == 0:
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.yIndex)[0][0]
+						z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.zIndex)[0][0]
+						newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
+						print(newData[::, x_ind])
+						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
+
+
+						for pt in newData:
+							self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]*self.gval
+						yield self.sleep(0.1)
+						self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels =False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+						self.isData = True
+					else:
+						self.z2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex, self.z2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.yIndex)[0][0]
+						z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.zIndex)[0][0]
+						z2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.z2Index)[0][0]
+						newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
+						print(newData[::, x_ind])
+						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
+
+
+						for pt in newData:
+							if self.oIndex == 0:
+								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (pt[z_ind]+pt[z2_ind])*self.gval
+							elif self.oIndex == 1:
+								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (pt[z_ind]-pt[z2_ind])*self.gval
+							elif self.oIndex == 2:
+								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (pt[z_ind]*pt[z2_ind])*self.gval
+							elif self.oIndex == 3:
+								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (np.divide(pt[z_ind], pt[z2_ind], out=np.zeros_like(pt[z_ind], dtype=float), where=pt[z2_ind]!=0))*self.gval
+							else:
+								pass
+						yield self.sleep(0.1)
+						self.z2Index +=1
+						self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+						self.isData = True
+			end = time.time()
+			print(end-start)
+			"""if self.gval == -1:
+				if self.z2Index == 0:
+					inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex])
+					newData = np.delete(np.asarray(newData), inx, axis = 1)
+					x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.xIndex)[0][0]
+					y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.yIndex)[0][0]
+					z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.zIndex)[0][0]
+					newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
+					print(newData[::, x_ind])
+					newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
+
+
+					for pt in newData:
+						self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]
+					yield self.sleep(0.1)	
+					self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+					self.isData = True
+				else:
+					self.z2Index -=1
+					inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex, self.z2Index])
+					newData = np.delete(np.asarray(newData), inx, axis = 1)
+					x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.xIndex)[0][0]
+					y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.yIndex)[0][0]
+					z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.zIndex)[0][0]
+					z2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.z2Index)[0][0]
+					newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
+					print(newData[::, x_ind])
+					newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
+
+
+					for pt in newData:
+						if self.oIndex == 0:
+							self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]+pt[z2_ind]
+						elif self.oIndex == 1:
+							self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]-pt[z2_ind]
+						elif self.oIndex == 2:
+							self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]*pt[z2_ind]
+						elif self.oIndex == 3:
+							self.plotData[int(pt[x_ind]), int(pt[y_ind])] = np.divide(pt[z_ind], pt[z2_ind], out=np.zeros_like(pt[z_ind], dtype=float), where=pt[z2_ind]!=0)
+						else:
+							pass
+					yield self.sleep(0.1)	
+					self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+					self.isData = True
+			else: 
+				if self.z2Index == 0:
+					inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex])
+					newData = np.delete(np.asarray(newData), inx, axis = 1)
+					x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.xIndex)[0][0]
+					y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.yIndex)[0][0]
+					z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.zIndex)[0][0]
+					newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
+					print(newData[::, x_ind])
+					newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
+
+
+					for pt in newData:
+						self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]*self.gval
+					yield self.sleep(0.1)
+					self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+					self.isData = True
+				else:
+					self.z2Index -= 1
+					inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex, self.z2Index])
+					newData = np.delete(np.asarray(newData), inx, axis = 1)
+					x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.xIndex)[0][0]
+					y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.yIndex)[0][0]
+					z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.zIndex)[0][0]
+					z2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.z2Index)[0][0]
+					newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
+					print(newData[::, x_ind])
+					newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
+
+
+					for pt in newData:
+						if self.oIndex == 0:
+							self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (pt[z_ind]+pt[z2_ind])*self.gval
+						elif self.oIndex == 1:
+							self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (pt[z_ind]-pt[z2_ind])*self.gval
+						elif self.oIndex == 2:
+							self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (pt[z_ind]*pt[z2_ind])*self.gval
+						elif self.oIndex == 3:
+							self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (np.divide(pt[z_ind], pt[z2_ind], out=np.zeros_like(pt[z_ind], dtype=float), where=pt[z2_ind]!=0))*self.gval
+						else:
+							pass
+					yield self.sleep(0.1)	
+					self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+					self.isData = True"""
 		except Exception as inst:
 			print('Following error was thrown: ')
 			print(inst)
 			print('Error thrown on line: ')
 			print(sys.exc_traceback.tb_lineno) 
 	@inlineCallbacks
+	
 	def plotMore(self, newData, x_ind, y_ind, z_ind, c):
 		yield self.sleep(0.1)
 
@@ -575,6 +855,9 @@ class plot2DWindow(QtWidgets.QDialog):
 
 		self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 
+	
+
+	    
 		
 		
 
@@ -600,14 +883,48 @@ class plot1DWindow(QtWidgets.QDialog):
 		self.numLines = 1
 		self.Data = np.array([])
 		self.plotTitle = self.plotInfo['title']
-		if self.plotTitle[0:5] == 'Plot ':
-			self.plotTitle = self.plotInfo['y axis'] + ' vs. ' + self.plotInfo['x axis']
+		
 		self.setWindowTitle(self.plotTitle)
 		self.xIndex = self.plotInfo['x index']
 		self.yIndex = self.plotInfo['y index']
-		
+		self.y2Index = self.plotInfo['y index 2']
+		self.oIndex = 3-self.plotInfo['operation index']
+		self.gvalue = self.plotInfo['gval']
 		self.extents = [self.plotInfo['x range'][0], self.plotInfo['x range'][1]]
 		self.pxsize = self.plotInfo['x points']
+		
+		if self.gvalue == -1.0: 
+			if self.y2Index == 0:
+				if self.plotTitle[0:5] == 'Plot ':
+					self.plotTitle = self.plotInfo['y axis'] + ' vs. ' + self.plotInfo['x axis']
+			elif self.oIndex == 3:
+				if self.plotTitle[0:5] == 'Plot ':
+					self.plotTitle = self.plotInfo['y axis']+"/"+self.plotInfo['y axis 2'] + ' vs. ' + self.plotInfo['x axis']
+			elif self.oIndex == 2:
+				if self.plotTitle[0:5] == 'Plot ':
+					self.plotTitle = self.plotInfo['y axis']+"*"+self.plotInfo['y axis 2'] + ' vs. ' + self.plotInfo['x axis']
+			elif self.oIndex == 1:
+				if self.plotTitle[0:5] == 'Plot ':
+					self.plotTitle = self.plotInfo['y axis']+"-"+self.plotInfo['y axis 2'] + ' vs. ' + self.plotInfo['x axis']
+			else:
+				if self.plotTitle[0:5] == 'Plot ':
+					self.plotTitle = self.plotInfo['y axis']+"+"+self.plotInfo['y axis 2'] + ' vs. ' + self.plotInfo['x axis']
+		else: 
+			if self.y2Index == 0:
+				if self.plotTitle[0:5] == 'Plot ':
+					self.plotTitle = self.plotInfo['y axis'] + ' vs. ' + self.plotInfo['x axis']+ " , gain = "+ str(self.gvalue)
+			elif self.oIndex == 3:
+				if self.plotTitle[0:5] == 'Plot ':
+					self.plotTitle = self.plotInfo['y axis']+"/"+self.plotInfo['y axis 2'] + ' vs. ' + self.plotInfo['x axis'] + " , gain = "+ str(self.gvalue)
+			elif self.oIndex == 2:
+				if self.plotTitle[0:5] == 'Plot ':
+					self.plotTitle = self.plotInfo['y axis']+"*"+self.plotInfo['y axis 2'] + ' vs. ' + self.plotInfo['x axis'] + " , gain = "+ str(self.gvalue)
+			elif self.oIndex == 1:
+				if self.plotTitle[0:5] == 'Plot ':
+					self.plotTitle = self.plotInfo['y axis']+"-"+self.plotInfo['y axis 2'] + ' vs. ' + self.plotInfo['x axis'] + " , gain = "+ str(self.gvalue)
+			else:
+				if self.plotTitle[0:5] == 'Plot ':
+					self.plotTitle = self.plotInfo['y axis']+"+"+self.plotInfo['y axis 2'] + ' vs. ' + self.plotInfo['x axis'] + " , gain = "+ str(self.gvalue)
 		
 		self.setupPlot()
 		self.setupListener(self.reactor)
@@ -632,7 +949,16 @@ class plot1DWindow(QtWidgets.QDialog):
 		self.plot1D = pg.PlotWidget()
 		self.plot1D.showAxis('right', show = True)
 		self.plot1D.showAxis('top', show = True)
-		self.plot1D.setLabel('left', self.plotInfo['y axis'])
+		if self.y2Index ==0:
+			self.plot1D.setLabel('left', self.plotInfo['y axis'])
+		elif self.oIndex ==3:
+			self.plot1D.setLabel('left', self.plotInfo['y axis']+"/"+self.plotInfo['y axis 2'])
+		elif self.oIndex ==2:
+			self.plot1D.setLabel('left', self.plotInfo['y axis']+"*"+self.plotInfo['y axis 2'])
+		elif self.oIndex ==1:
+			self.plot1D.setLabel('left', self.plotInfo['y axis']+"-"+self.plotInfo['y axis 2'])
+		else:
+			self.plot1D.setLabel('left', self.plotInfo['y axis']+"+"+self.plotInfo['y axis 2'])
 		self.plot1D.setLabel('bottom', self.plotInfo['x axis'])
 		self.plot1D.enableAutoRange(enable = True)
 
@@ -711,30 +1037,235 @@ class plot1DWindow(QtWidgets.QDialog):
 			newData = yield self.dv.get()
 			
 			if len(newData[0]) != 0:
+				if self.gvalue ==-1:
+					if self.y2Index ==0:
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex]) == self.yIndex)[0][0]
 
-				inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex])
-				newData = np.delete(np.asarray(newData), inx, axis = 1)
-				
-				x_ind = np.where(np.sort([self.xIndex, self.yIndex]) == self.xIndex)[0][0]
-				y_ind = np.where(np.sort([self.xIndex, self.yIndex]) == self.yIndex)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
 
-				self.Data = newData
-				self.isData = True
-				self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
-
-				if len(self.binned) > 2:
-					p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
-					if len(p) != 0:
-						xVals = newData[p[-1][0]+1::, x_ind]
-						yVals = newData[p[-1][0]+1::, y_ind]
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = newData[p[-1][0]+1::, y_ind]
+							else:
+								xVals, yVals = newData[::, x_ind], newData[::, y_ind]
+							
+						else:
+							xVals, yVals = newData[::, x_ind], newData[::, y_ind]
+					elif self.oIndex ==3:
+						self.y2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.y2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.yIndex)[0][0]
+						y2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.y2Index)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						self.y2Index +=1
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = np.divide(newData[p[-1][0]+1::, y_ind], newData[p[-1][0]+1::, y2_ind], out=np.zeros_like(newData[p[-1][0]+1::, y_ind], dtype=float), where=newData[p[-1][0]+1::, y2_ind]!=0)
+							else:
+								xVals, yVals = newData[::, x_ind], np.divide(newData[::, y_ind], newData[::, y2_ind], out=np.zeros_like(newData[::, y_ind], dtype=float), where=newData[::, y2_ind]!=0)
+							
+						else:
+							xVals, yVals = newData[::, x_ind], np.divide(newData[::, y_ind], newData[::, y2_ind], out=np.zeros_like(newData[::, y_ind], dtype=float), where=newData[::, y2_ind]!=0)
+					elif self.oIndex ==2:
+						self.y2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.y2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.yIndex)[0][0]
+						y2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.y2Index)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						self.y2Index +=1
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = newData[p[-1][0]+1::, y_ind]*newData[p[-1][0]+1::, y2_ind]
+							else:
+								xVals, yVals = newData[::, x_ind], newData[::, y_ind]*newData[::, y2_ind]
+							
+						else:
+							xVals, yVals = newData[::, x_ind], newData[::, y_ind]*newData[::, y2_ind]
+					elif self.oIndex ==1:
+						self.y2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.y2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.yIndex)[0][0]
+						y2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.y2Index)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						self.y2Index +=1
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = newData[p[-1][0]+1::, y_ind]-newData[p[-1][0]+1::, y2_ind]
+							else:
+								xVals, yVals = newData[::, x_ind], newData[::, y_ind]-newData[::, y2_ind]
+							
+						else:
+							xVals, yVals = newData[::, x_ind], newData[::, y_ind]-newData[::, y2_ind]
 					else:
-						xVals, yVals = newData[::, x_ind], newData[::, y_ind]
-					
+						self.y2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.y2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.yIndex)[0][0]
+						y2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.y2Index)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						self.y2Index +=1
+
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = newData[p[-1][0]+1::, y_ind]+newData[p[-1][0]+1::, y2_ind]
+							else:
+								xVals, yVals = newData[::, x_ind], newData[::, y_ind]+newData[::, y2_ind]
+							
+						else:
+							xVals, yVals = newData[::, x_ind], newData[::, y_ind]+newData[::, y2_ind]
 				else:
-					xVals, yVals = newData[::, x_ind], newData[::, y_ind]
+					if self.y2Index ==0:
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex]) == self.yIndex)[0][0]
+
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = newData[p[-1][0]+1::, y_ind]*self.gvalue
+							else:
+								xVals, yVals = newData[::, x_ind], newData[::, y_ind]*self.gvalue
+							
+						else:
+							xVals, yVals = newData[::, x_ind], newData[::, y_ind]*self.gvalue
+					elif self.oIndex ==3:
+						self.y2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.y2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.yIndex)[0][0]
+						y2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.y2Index)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						self.y2Index +=1
+
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = np.divide(newData[p[-1][0]+1::, y_ind], newData[p[-1][0]+1::, y2_ind], out=np.zeros_like(newData[p[-1][0]+1::, y_ind], dtype=float), where=newData[p[-1][0]+1::, y2_ind]!=0)*self.gvalue
+							else:
+								xVals, yVals = newData[::, x_ind], np.divide(newData[::, y_ind], newData[::, y2_ind], out=np.zeros_like(newData[::, y_ind], dtype=float), where=newData[::, y2_ind]!=0)*self.gvalue
+							
+						else:
+							xVals, yVals = newData[::, x_ind], np.divide(newData[::, y_ind], newData[::, y2_ind], out=np.zeros_like(newData[::, y_ind], dtype=float), where=newData[::, y2_ind]!=0)*self.gvalue
+					elif self.oIndex ==2:
+						self.y2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.y2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.yIndex)[0][0]
+						y2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.y2Index)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						self.y2Index +=1
+
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = newData[p[-1][0]+1::, y_ind]*newData[p[-1][0]+1::, y2_ind]*self.gvalue
+							else:
+								xVals, yVals = newData[::, x_ind], newData[::, y_ind]*newData[::, y2_ind]*self.gvalue
+							
+						else:
+							xVals, yVals = newData[::, x_ind], newData[::, y_ind]*newData[::, y2_ind]*self.gvalue
+					elif self.oIndex ==1:
+						self.y2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.y2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.yIndex)[0][0]
+						y2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.y2Index)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						self.y2Index +=1
+
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = (newData[p[-1][0]+1::, y_ind]-newData[p[-1][0]+1::, y2_ind])*self.gvalue
+							else:
+								xVals, yVals = newData[::, x_ind], (newData[::, y_ind]-newData[::, y2_ind])*self.gvalue
+							
+						else:
+							xVals, yVals = newData[::, x_ind], (newData[::, y_ind]-newData[::, y2_ind])*self.gvalue
+					else:
+						self.y2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.y2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.yIndex)[0][0]
+						y2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.y2Index)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						self.y2Index +=1
+
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = (newData[p[-1][0]+1::, y_ind]+newData[p[-1][0]+1::, y2_ind])*self.gvalue
+							else:
+								xVals, yVals = newData[::, x_ind], (newData[::, y_ind]+newData[::, y2_ind])*self.gvalue
+							
+						else:
+							xVals, yVals = newData[::, x_ind], (newData[::, y_ind]+newData[::, y2_ind])*self.gvalue
 
 				self.plot1D.clear()
 				self.plot1D.plot(x = xVals, y = yVals, pen =pg.mkPen(color=self.penColor))
+			
 		except Exception as inst:
 			print('Following error was thrown: ')
 			print(inst)
@@ -749,22 +1280,241 @@ class plot1DWindow(QtWidgets.QDialog):
 
 	@inlineCallbacks
 	def updatePlot(self, c, signal):
+		try:
+			newData = yield self.dv.get()
+			if len(newData[0]) != 0:
+				if self.gvalue ==-1:
+					if self.y2Index ==0:
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex]) == self.yIndex)[0][0]
 
-		newData = yield self.dv.get()
-		inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex])
-		newData = np.delete(np.asarray(newData), inx, axis = 1)
-		
-		x_ind = np.where(np.sort([self.xIndex, self.yIndex]) == self.xIndex)[0][0]
-		y_ind = np.where(np.sort([self.xIndex, self.yIndex]) == self.yIndex)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = newData[p[-1][0]+1::, y_ind]
+							else:
+								xVals, yVals = newData[::, x_ind], newData[::, y_ind]
+							
+						else:
+							xVals, yVals = newData[::, x_ind], newData[::, y_ind]
+					elif self.oIndex ==3:
+						self.y2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.y2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.yIndex)[0][0]
+						y2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.y2Index)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						self.y2Index +=1
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = np.divide(newData[p[-1][0]+1::, y_ind], newData[p[-1][0]+1::, y2_ind], out=np.zeros_like(newData[p[-1][0]+1::, y_ind], dtype=float), where=newData[p[-1][0]+1::, y2_ind]!=0)
+							else:
+								xVals, yVals = newData[::, x_ind], np.divide(newData[::, y_ind], newData[::, y2_ind], out=np.zeros_like(newData[::, y_ind], dtype=float), where=newData[::, y2_ind]!=0)
+							
+						else:
+							xVals, yVals = newData[::, x_ind], np.divide(newData[::, y_ind], newData[::, y2_ind], out=np.zeros_like(newData[::, y_ind], dtype=float), where=newData[::, y2_ind]!=0)
+					elif self.oIndex ==2:
+						self.y2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.y2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+							
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.yIndex)[0][0]
+						y2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.y2Index)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						self.y2Index +=1
 
-		
-		if self.isData != False:
-			self.Data = np.vstack((self.Data, newData))
-		else:
-			self.Data = newData
-			self.isData = True
-		self.binned = np.digitize(self.Data[::, x_ind], self.xBins) - 1
-		yield self.plotMore(x_ind, y_ind, self.reactor)
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = newData[p[-1][0]+1::, y_ind]*newData[p[-1][0]+1::, y2_ind]
+							else:
+								xVals, yVals = newData[::, x_ind], newData[::, y_ind]*newData[::, y2_ind]
+							
+						else:
+							xVals, yVals = newData[::, x_ind], newData[::, y_ind]*newData[::, y2_ind]
+					elif self.oIndex ==1:
+						self.y2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.y2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+							
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.yIndex)[0][0]
+						y2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.y2Index)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						self.y2Index +=1
+
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = newData[p[-1][0]+1::, y_ind]-newData[p[-1][0]+1::, y2_ind]
+							else:
+								xVals, yVals = newData[::, x_ind], newData[::, y_ind]-newData[::, y2_ind]
+							
+						else:
+							xVals, yVals = newData[::, x_ind], newData[::, y_ind]-newData[::, y2_ind]
+					else:
+						self.y2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.y2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.yIndex)[0][0]
+						y2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.y2Index)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						self.y2Index +=1
+
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = newData[p[-1][0]+1::, y_ind]+newData[p[-1][0]+1::, y2_ind]
+							else:
+								xVals, yVals = newData[::, x_ind], newData[::, y_ind]+newData[::, y2_ind]
+							
+						else:
+							xVals, yVals = newData[::, x_ind], newData[::, y_ind]+newData[::, y2_ind]
+				else:
+					if self.y2Index ==0:
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+							
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex]) == self.yIndex)[0][0]
+
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = newData[p[-1][0]+1::, y_ind]*self.gvalue
+							else:
+								xVals, yVals = newData[::, x_ind], newData[::, y_ind]*self.gvalue
+								
+						else:
+							xVals, yVals = newData[::, x_ind], newData[::, y_ind]*self.gvalue
+					elif self.oIndex ==3:
+						self.y2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.y2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+							
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.yIndex)[0][0]
+						y2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.y2Index)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						self.y2Index +=1
+
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = np.divide(newData[p[-1][0]+1::, y_ind], newData[p[-1][0]+1::, y2_ind], out=np.zeros_like(newData[p[-1][0]+1::, y_ind], dtype=float), where=newData[p[-1][0]+1::, y2_ind]!=0)*self.gvalue
+							else:
+								xVals, yVals = newData[::, x_ind], np.divide(newData[::, y_ind], newData[::, y2_ind], out=np.zeros_like(newData[::, y_ind], dtype=float), where=newData[::, y2_ind]!=0)*self.gvalue
+								
+						else:
+							xVals, yVals = newData[::, x_ind], np.divide(newData[::, y_ind], newData[::, y2_ind], out=np.zeros_like(newData[::, y_ind], dtype=float), where=newData[::, y2_ind]!=0)*self.gvalue
+					elif self.oIndex ==2:
+						self.y2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.y2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+							
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.yIndex)[0][0]
+						y2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.y2Index)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						self.y2Index +=1
+
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = newData[p[-1][0]+1::, y_ind]*newData[p[-1][0]+1::, y2_ind]*self.gvalue
+							else:
+								xVals, yVals = newData[::, x_ind], newData[::, y_ind]*newData[::, y2_ind]*self.gvalue
+							
+						else:
+							xVals, yVals = newData[::, x_ind], newData[::, y_ind]*newData[::, y2_ind]*self.gvalue
+					elif self.oIndex ==1:
+						self.y2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.y2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.yIndex)[0][0]
+						y2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.y2Index)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						self.y2Index +=1
+
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = (newData[p[-1][0]+1::, y_ind]-newData[p[-1][0]+1::, y2_ind])*self.gvalue
+							else:
+								xVals, yVals = newData[::, x_ind], (newData[::, y_ind]-newData[::, y2_ind])*self.gvalue
+							
+						else:
+							xVals, yVals = newData[::, x_ind], (newData[::, y_ind]-newData[::, y2_ind])*self.gvalue
+					else:
+						self.y2Index -=1
+						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.y2Index])
+						newData = np.delete(np.asarray(newData), inx, axis = 1)
+						
+						x_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.xIndex)[0][0]
+						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.yIndex)[0][0]
+						y2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.y2Index]) == self.y2Index)[0][0]
+						self.Data = newData
+						self.isData = True
+						self.binned = np.digitize(newData[::, x_ind], self.xBins) - 1
+						self.y2Index +=1
+						if len(self.binned) > 2:
+							p = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0])
+							if len(p) != 0:
+								xVals = newData[p[-1][0]+1::, x_ind]
+								yVals = (newData[p[-1][0]+1::, y_ind]+newData[p[-1][0]+1::, y2_ind])*self.gvalue
+							else:
+								xVals, yVals = newData[::, x_ind], (newData[::, y_ind]+newData[::, y2_ind])*self.gvalue
+							
+						else:
+							xVals, yVals = newData[::, x_ind], (newData[::, y_ind]+newData[::, y2_ind])*self.gvalue
+				yield self.sleep(0.1)
+				self.plot1D.clear()
+				self.plot1D.plot(x = xVals, y = yVals, pen =pg.mkPen(color=self.penColor))
+		except Exception as inst:
+			print('Following error was thrown: ')
+			print(inst)
+			print('Error thrown on line: ')
+			print(sys.exc_traceback.tb_lineno) 
 
 	@inlineCallbacks
 	def plotMore(self, x_ind, y_ind, c):
@@ -825,19 +1575,35 @@ class plotSaved1DWindow(QtWidgets.QWidget):
 
 		self.xIndex = self.plotInfo['x index']
 		self.yIndex = self.plotInfo['y index']
+		self.y2Index = self.plotInfo['y index 2']
+		self.oIndex = 3-self.plotInfo['operation index']
+		self.gain = self.plotInfo['gval']
+
+		self.xAxis = self.plotInfo['x axis']
+		self.yAxis = self.plotInfo['y axis']
+		self.y2Axis = self.plotInfo['y axis 2']
+		self.o = self.plotInfo['operation']
 		
 		self.colorWheel = [(0,114,189), (216,83,25), (237,177,32), (126,47,142), (119,172,48)]
 		self.QColorWheel = [QtGui.QColor(0,114,189), QtGui.QColor(216,83,25), QtGui.QColor(237,177,32), QtGui.QColor(126,47,142), QtGui.QColor(119,172,48)]
 		self.penColor = self.colorWheel[int(pencolor)%5]
 
-		
-		self.xAxis = self.plotInfo['x axis']
-		self.yAxis = self.plotInfo['y axis']
-
 		self.notes = ''
 		self.plotTitle = self.plotInfo['title']
-		if self.plotTitle[0:5] == 'Plot ':
-			self.plotTitle = self.yAxis + ' vs. ' + self.xAxis
+		if self.gain == -1:
+			if self.y2Index == 0:
+				if self.plotTitle[0:5] == 'Plot ':
+					self.plotTitle = self.yAxis + ' vs. ' + self.xAxis
+			else:
+				if self.plotTitle[0:5] == 'Plot ':
+					self.plotTitle = self.yAxis + self.o + self.y2Axis + ' vs. ' + self.xAxis
+		else:
+			if self.y2Index == 0:
+				if self.plotTitle[0:5] == 'Plot ':
+					self.plotTitle = self.yAxis + ' vs. ' + self.xAxis + " ,gain = " + str(self.gain)
+			else:
+				if self.plotTitle[0:5] == 'Plot ':
+					self.plotTitle = self.yAxis + self.o + self.y2Axis + ' vs. ' + self.xAxis + " ,gain = " + str(self.gain)
 		self.pdfNum = 1
 		
 		self.resize(675,330)
@@ -857,12 +1623,12 @@ class plotSaved1DWindow(QtWidgets.QWidget):
 		self.plot1D.enableAutoRange(enable = True)
 		
 		
-		self.saveMATBtn = QtGui.QPushButton()
-		self.savePDFBtn = QtGui.QPushButton()
-		self.editNotesBtn = QtGui.QPushButton()
-		self.openDVBtn = QtGui.QPushButton()
-		self.backBtn = QtGui.QPushButton()
-		self.backBtn1 = QtGui.QPushButton()
+		self.saveMATBtn = QtWidgets.QPushButton()
+		self.savePDFBtn = QtWidgets.QPushButton()
+		self.editNotesBtn = QtWidgets.QPushButton()
+		self.openDVBtn = QtWidgets.QPushButton()
+		self.backBtn = QtWidgets.QPushButton()
+		self.backBtn1 = QtWidgets.QPushButton()
 		
 		self.saveMATBtn.clicked.connect(self.save1DMAT)
 		self.savePDFBtn.clicked.connect(self.savePDF)
@@ -961,13 +1727,94 @@ class plotSaved1DWindow(QtWidgets.QWidget):
 			except:
 				getFlag = False
 		print('got all data')
-
-		inds =[self.xIndex, self.yIndex]
-		inx = np.delete(np.arange(0, len(self.Data[0])), inds)
-		self.Data = np.delete(self.Data, inx, axis = 1)
-		self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
-		self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-		self.xVals, self.yVals = self.Data[::, self.x_ind], self.Data[::, self.y_ind]
+		if self.gain == -1:
+			if self.y2Index == 0:
+				inds =[self.xIndex, self.yIndex]
+				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
+				self.Data = np.delete(self.Data, inx, axis = 1)
+				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
+				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.xVals, self.yVals = self.Data[::, self.x_ind], self.Data[::, self.y_ind]
+			elif self.oIndex == 3: 
+				self.y2Index -=1
+				inds =[self.xIndex, self.yIndex, self.y2Index]
+				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
+				self.Data = np.delete(self.Data, inx, axis = 1)
+				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
+				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.y2_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.xVals, self.yVals = self.Data[::, self.x_ind], (np.divide(self.Data[::, self.y_ind], self.Data[::, self.y2_ind], out=np.zeros_like(self.Data[::, self.y_ind], dtype=float), where=self.Data[::, self.y2_ind]!=0))
+			elif self.oIndex == 2: 
+				self.y2Index -=1
+				inds =[self.xIndex, self.yIndex, self.y2Index]
+				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
+				self.Data = np.delete(self.Data, inx, axis = 1)
+				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
+				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.y2_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.xVals, self.yVals = self.Data[::, self.x_ind], self.Data[::, self.y_ind]*self.Data[::, self.y2_ind]
+			elif self.oIndex == 1: 
+				self.y2Index -=1
+				inds =[self.xIndex, self.yIndex, self.y2Index]
+				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
+				self.Data = np.delete(self.Data, inx, axis = 1)
+				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
+				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.y2_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.xVals, self.yVals = self.Data[::, self.x_ind], self.Data[::, self.y_ind]-self.Data[::, self.y2_ind]
+			else: 
+				self.y2Index -=1
+				inds =[self.xIndex, self.yIndex, self.y2Index]
+				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
+				self.Data = np.delete(self.Data, inx, axis = 1)
+				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
+				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.y2_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.xVals, self.yVals = self.Data[::, self.x_ind], self.Data[::, self.y_ind]+self.Data[::, self.y2_ind]
+		else:
+			if self.y2Index == 0:
+				inds =[self.xIndex, self.yIndex]
+				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
+				self.Data = np.delete(self.Data, inx, axis = 1)
+				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
+				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.xVals, self.yVals = self.Data[::, self.x_ind], self.Data[::, self.y_ind]*self.gain
+			elif self.oIndex == 3: 
+				self.y2Index -=1
+				inds =[self.xIndex, self.yIndex, self.y2Index]
+				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
+				self.Data = np.delete(self.Data, inx, axis = 1)
+				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
+				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.y2_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.xVals, self.yVals = self.Data[::, self.x_ind], (np.divide(self.Data[::, self.y_ind], self.Data[::, self.y2_ind], out=np.zeros_like(self.Data[::, self.y_ind], dtype=float), where=self.Data[::, self.y2_ind]!=0))*self.gain
+			elif self.oIndex == 2: 
+				self.y2Index -=1
+				inds =[self.xIndex, self.yIndex, self.y2Index]
+				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
+				self.Data = np.delete(self.Data, inx, axis = 1)
+				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
+				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.y2_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.xVals, self.yVals = self.Data[::, self.x_ind], self.Data[::, self.y_ind]*self.Data[::, self.y2_ind]*self.gain
+			elif self.oIndex == 1: 
+				self.y2Index -=1
+				inds =[self.xIndex, self.yIndex, self.y2Index]
+				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
+				self.Data = np.delete(self.Data, inx, axis = 1)
+				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
+				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.y2_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.xVals, self.yVals = self.Data[::, self.x_ind], (self.Data[::, self.y_ind]-self.Data[::, self.y2_ind])*self.gain
+			else: 
+				self.y2Index -=1
+				inds =[self.xIndex, self.yIndex, self.y2Index]
+				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
+				self.Data = np.delete(self.Data, inx, axis = 1)
+				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
+				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.y2_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.xVals, self.yVals = self.Data[::, self.x_ind], (self.Data[::, self.y_ind]+self.Data[::, self.y2_ind])*self.gain
 		
 		self.plot1D.plot(x = self.xVals, y = self.yVals, pen =pg.mkPen(color=self.penColor))
 		
@@ -1103,22 +1950,36 @@ class plotSaved2DWindow(QtWidgets.QWidget):
 		self.dir = dir
 		self.plotInfo = plotInfo
 		print(self.plotInfo)
+		print("\nSaved2DWindow Initiated!\n")
 		print('--------------------------------------------')
 
 		self.xIndex = self.plotInfo['x index']
 		self.yIndex = self.plotInfo['y index']
 		self.zIndex = self.plotInfo['z index']
-		
+		self.z2Index = self.plotInfo['z index 2']
+		self.oIndex = 3-self.plotInfo['operation index']
+		self.gain = self.plotInfo['gval']
+
 		self.xAxis = self.plotInfo['x axis']
 		self.yAxis = self.plotInfo['y axis']
 		self.zAxis = self.plotInfo['z axis']
+		self.z2Axis = self.plotInfo['z axis 2']
+		self.o = self.plotInfo['operation']
 
 		self.notes = ''
 		self.plotTitle = self.plotInfo['title']
 		if self.plotTitle[0:5] == 'Plot ':
-			self.plotTitle = self.zAxis + ' vs. ' + self.xAxis + ' and ' + self.yAxis
+			if self.gain == -1:
+				if self.z2Index == 0:
+					self.plotTitle = self.plotInfo['z axis'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis']
+				else: 
+					self.plotTitle = self.plotInfo['z axis'] + self.plotInfo['operation'] + self.plotInfo['z axis 2'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis']
+			else:
+				if self.z2Index == 0:
+					self.plotTitle = self.plotInfo['z axis'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis'] + ", gain = "+ str(self.plotInfo['gval'])
+				else: 
+					self.plotTitle = self.plotInfo['z axis'] + self.plotInfo['operation'] + self.plotInfo['z axis 2'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis'] + ", gain = "+ str(self.plotInfo['gval'])	
 		self.pdfNum = 1
-		
 		self.resize(800,800)
 		self.move(450, yMovePos)
 		p = self.palette()
@@ -1135,7 +1996,7 @@ class plotSaved2DWindow(QtWidgets.QWidget):
 		self.viewBig.setAspectLocked(lock = False, ratio = 1)
 		self.mainPlot = pg.ImageView(view = self.viewBig)
 		self.mainPlot.ui.menuBtn.hide()
-		self.mainPlot.ui.histogram.item.gradient.loadPreset('bipolar')
+		self.mainPlot.ui.histogram.item.gradient.loadPreset('inferno')
 		self.mainPlot.ui.roiBtn.hide()
 		self.mainPlot.ui.menuBtn.hide()
 		self.viewBig.setAspectLocked(False)
@@ -1180,7 +2041,7 @@ class plotSaved2DWindow(QtWidgets.QWidget):
 		self.tracePosLbl.setText('Line Cut Position:')
 		self.tracePosLbl.setStyleSheet('QLabel#tracePosLbl {color: rgb(131,131,131); font: 10pt;}')
 		
-		self.tracePosBox = QtGui.QDoubleSpinBox()
+		self.tracePosBox = QtWidgets.QDoubleSpinBox()
 		self.tracePosBox.setObjectName('tracePosBox')
 		self.tracePosBox.setButtonSymbols(2)
 		self.tracePosBox.setValue(0)
@@ -1189,12 +2050,12 @@ class plotSaved2DWindow(QtWidgets.QWidget):
 		self.tracePosBox.valueChanged.connect(self.updateTrace)
 		
 		
-		self.saveMATBtn = QtGui.QPushButton()
-		self.savePDFBtn = QtGui.QPushButton()
-		self.editNotesBtn = QtGui.QPushButton()
-		self.openDVBtn = QtGui.QPushButton()
-		self.backBtn = QtGui.QPushButton()
-		self.backBtn1 = QtGui.QPushButton()
+		self.saveMATBtn = QtWidgets.QPushButton()
+		self.savePDFBtn = QtWidgets.QPushButton()
+		self.editNotesBtn =QtWidgets.QPushButton()
+		self.openDVBtn = QtWidgets.QPushButton()
+		self.backBtn = QtWidgets.QPushButton()
+		self.backBtn1 = QtWidgets.QPushButton()
 		
 		self.saveMatMenu = QtWidgets.QMenu()
 		save1D = QtWidgets.QAction("Save 1D trace", self)
@@ -1292,6 +2153,7 @@ class plotSaved2DWindow(QtWidgets.QWidget):
 		self.openFile(self.reactor)
 		
 	def updateTrace(self):
+		print("\nupdateTrace Initiated!\n")
 		pos = self.tracePosBox.value()
 		if self.xySelectBox.currentIndex() == 1:
 			self.yLine.setValue(pos)
@@ -1303,6 +2165,7 @@ class plotSaved2DWindow(QtWidgets.QWidget):
 		
 	@inlineCallbacks
 	def openFile(self, c):
+		print("\nopenFile Initiated!\n")
 		from labrad.wrappers import connectAsync
 
 		self.cxnS = yield connectAsync()
@@ -1319,6 +2182,7 @@ class plotSaved2DWindow(QtWidgets.QWidget):
 
 	@inlineCallbacks
 	def loadData(self, c):
+		print("\nloadData Initiated!\n")
 		getFlag = True
 		self.Data = np.array([])
 		while getFlag == True:
@@ -1334,16 +2198,30 @@ class plotSaved2DWindow(QtWidgets.QWidget):
 			except:
 				getFlag = False
 		print('got all data')
-
-		inds =[self.xIndex, self.yIndex, self.zIndex]
-		inx = np.delete(np.arange(0, len(self.Data[0])), inds)
-		self.Data = np.delete(self.Data, inx, axis = 1)
-		self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
-		self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-		self.z_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
+		import time
+		start = time.time()
+		if self.z2Index !=0:
+			inds =[self.xIndex, self.yIndex, self.zIndex, self.z2Index-1]
+			inx = np.delete(np.arange(0, len(self.Data[0])), inds)
+			self.Data = np.delete(self.Data, inx, axis = 1)
+			self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
+			self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+			self.z_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
+			self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
+			end = time.time()
+		else:
+			inds =[self.xIndex, self.yIndex, self.zIndex]
+			inx = np.delete(np.arange(0, len(self.Data[0])), inds)
+			self.Data = np.delete(self.Data, inx, axis = 1)
+			self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
+			self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+			self.z_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
+			end = time.time()
+		print("Time taken to process data: ",end-start) #for debugging
 		#self.xData = self.Data[::, self.xIndex]
 		#self.yData = self.Data[::, self.yIndex]
-
+		print(self.oIndex, self.gain)
+		print("\n\n")
 		params = yield self.dv.get_parameters()
 					
 		if params != None:
@@ -1402,9 +2280,46 @@ class plotSaved2DWindow(QtWidgets.QWidget):
 		try:
 			self.Data[::, self.x_ind] = np.digitize(self.Data[::, self.x_ind], self.xBins)-1
 			self.Data[::, self.y_ind] = np.digitize(self.Data[::, self.y_ind], self.yBins)-1
-			
-			for cell in self.Data:
-				self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]
+			if self.gain == -1 or self.gain == 0:
+				if self.z2Index == 0:
+					for cell in self.Data:
+						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]
+				elif self.oIndex == 3:
+					#self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
+					for cell in self.Data:
+						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = np.divide(cell[self.z_ind], cell[self.z2_ind], out=np.zeros_like(cell[self.z_ind], dtype=float), where=cell[self.z2_ind]!=0)
+				elif self.oIndex == 2:
+					#self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
+					for cell in self.Data:
+						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]*cell[self.z2_ind]
+				elif self.oIndex == 1:
+					#self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
+					for cell in self.Data:
+						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]*cell[self.z2_ind]
+				else:
+					#self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
+					for cell in self.Data:
+						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]*cell[self.z2_ind]
+			else:
+				if self.z2Index == 0:
+					for cell in self.Data:
+						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]*self.gain
+				elif self.oIndex == 3:
+					#self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
+					for cell in self.Data:
+						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = np.divide(cell[self.z_ind], cell[self.z2_ind], out=np.zeros_like(cell[self.z_ind], dtype=float), where=cell[self.z2_ind]!=0)*self.gain
+				elif self.oIndex == 2:
+					#self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
+					for cell in self.Data:
+						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]*cell[self.z2_ind]*self.gain
+				elif self.oIndex == 1:
+					#self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
+					for cell in self.Data:
+						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = (cell[self.z_ind] - cell[self.z2_ind])*self.gain
+				else:
+					#self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
+					for cell in self.Data:
+						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = (cell[self.z_ind] + cell[self.z2_ind])*self.gain
 		except Exception as inst:
 			print('Following error was thrown: ')
 			print(inst)
@@ -1767,6 +2682,7 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 	
 		self.cancelBtn.clicked.connect(self.closeWindow)
 		self.ok.clicked.connect(self.initPlot)
+		#self.ok.clicked.connect(self.get_gain_input)
 		
 		self.add1D.clicked.connect(self.add1DPlot)
 		self.add2D.clicked.connect(self.add2DPlot)
@@ -1795,8 +2711,7 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 		self.num1Plots, self.num2Plots = 0, 0
 		
 		self.popAxes(self.reactor)
-		
-		
+			
 	def moveDefault(self):
 		self.move(400,25)
 		
@@ -1841,14 +2756,13 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 		self.onePlots.itemSelectionChanged.connect(lambda: self.formatTable(1))
 		self.twoPlots.itemSelectionChanged.connect(lambda: self.formatTable(2))
 
-		self.onePlots.setColumnCount(4)
-		self.twoPlots.setColumnCount(4)
+		self.onePlots.setColumnCount(6)
+		self.twoPlots.setColumnCount(7)
 		
 		self.onePlots.insertRow(0)
 		self.twoPlots.insertRow(0)
-		num1, num2, lbl1, lbl2, x1, y1, x2, y2, z2 = QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem()
-		
-		headers = [lbl1, x1, y1, lbl2, x2, y2, z2]
+		num1, num2, lbl1, lbl2, x1, y1, x2, y2, z2, o1, z3, gainInput, y3, o2, gainInput2 = QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem()
+		headers = [lbl1, x1, y1, o2, y3, gainInput2, lbl2, x2, y2, z2, o1, z3, gainInput]
 		
 		num1.setText('Plot')
 		num1.setForeground(QtGui.QColor(131,131,131))
@@ -1871,29 +2785,47 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 		y2.setForeground(QtGui.QColor(131,131,131))
 		z2.setText('Z Axis')
 		z2.setForeground(QtGui.QColor(131,131,131))
+		o1.setText('Operation')
+		o1.setForeground(QtGui.QColor(131,131,131))
+		z3.setText('Z Axis 2')
+		z3.setForeground(QtGui.QColor(131,131,131))
+		y3.setText('Y Axis 2')
+		y3.setForeground(QtGui.QColor(131,131,131))
+		o2.setText('Operation')
+		o2.setForeground(QtGui.QColor(131,131,131))
+		gainInput2.setText('Gain')
+		gainInput2.setForeground(QtGui.QColor(131,131,131))
+		gainInput.setText('Gain')
+		gainInput.setForeground(QtGui.QColor(131,131,131))
 		
-		for ii in range(0, 3):
+		for ii in range(0, 6):
 			self.onePlots.setItem(0, ii, headers[ii])
 			self.onePlots.item(0, ii).setFont(QtGui.QFont("MS Shell Dlg 2",weight=QtGui.QFont.Bold))
 			self.onePlots.item(0, ii).setFlags(QtCore.Qt.NoItemFlags)
-		for ii in range(3, 7):
-			self.twoPlots.setItem(0, ii - 3, headers[ii])
-			self.twoPlots.item(0, ii - 3).setFont(QtGui.QFont("MS Shell Dlg 2",weight=QtGui.QFont.Bold))
-			self.twoPlots.item(0, ii - 3).setFlags(QtCore.Qt.NoItemFlags)
+		for ii in range(6, 13):
+			self.twoPlots.setItem(0, ii - 6, headers[ii])
+			self.twoPlots.item(0, ii - 6).setFont(QtGui.QFont("MS Shell Dlg 2",weight=QtGui.QFont.Bold))
+			self.twoPlots.item(0, ii - 6).setFlags(QtCore.Qt.NoItemFlags)
 			
 		self.onePlots.setColumnWidth(0, 98)
 		self.onePlots.setColumnWidth(1, 100)
 		self.onePlots.setColumnWidth(2, 100)
 		self.onePlots.setColumnWidth(3, 100)
+		self.onePlots.setColumnWidth(4, 100)
+		self.onePlots.setColumnWidth(5, 100)
+		self.onePlots.setColumnWidth(6, 100)
 		
 		self.twoPlots.setColumnWidth(1, 100)
 		self.twoPlots.setColumnWidth(2, 100)
 		self.twoPlots.setColumnWidth(3, 100)
 		self.twoPlots.setColumnWidth(0, 98)
+		self.twoPlots.setColumnWidth(4, 100)
+		self.twoPlots.setColumnWidth(5, 100)
+		self.twoPlots.setColumnWidth(6, 100)
 		
 	def formatTable(self, num = None):
 		if num == 1:
-			for c in range(0, 4):
+			for c in range(0, 6):
 				for r in range(0, self.onePlots.rowCount()):
 					if self.onePlots.item(r, c) != None:
 						self.onePlots.item(r, c).setBackground(QtGui.QColor(0,0,0))
@@ -1908,7 +2840,7 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 							item.setBackground(QtGui.QColor(100,100,150))
 							item.setForeground(QtGui.QColor(0,0,0))
 		elif num ==2:
-			for c in range(0, 4):
+			for c in range(0, 7):
 				for r in range(0, self.twoPlots.rowCount()):
 					if self.twoPlots.item(r, c) != None:
 						self.twoPlots.item(r, c).setBackground(QtGui.QColor(0,0,0))
@@ -1927,7 +2859,7 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 		self.formFlag = True
 		
 	def add1DPlot(self):
-		lbl, xAx, yAx = QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem()
+		lbl, xAx, yAx, yAx2, op, gval2 = QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem()
 		self.onePlots.insertRow(self.onePlots.rowCount())
 		
 		self.num1Plots += 1
@@ -1936,26 +2868,44 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 		lbl.setText(title)
 		xAx.setText(self.x1.currentText())
 		yAx.setText(self.y1.currentText())
+		yAx2.setText(self.y3.currentText())
+		op.setText(self.o2.currentText())
+		gval2.setText(self.gainInput2.text())
+		newItems = [lbl, xAx, yAx, op, yAx2, gval2]
 		
-		newItems = [lbl, xAx, yAx]
-		
-		plotInfo = {'title': title,
-					'x axis': str(self.x1.currentText()), 
-					'x index': self.x1.currentIndex(),
-					'y axis': str(self.y1.currentText()), 
-					'y index': self.y1.currentIndex()
-					}
-		
+		if self.gainInput2.text().replace(" ","")=="" or self.gainInput2.text().replace(" ","")=="0":
+			plotInfo = {'title': title,
+						'x axis': str(self.x1.currentText()), 
+						'x index': self.x1.currentIndex(),
+						'y axis': str(self.y1.currentText()), 
+						'y index': self.y1.currentIndex(),
+						'y axis 2': str(self.y3.currentText()),
+						'y index 2': self.y3.currentIndex(),
+						'operation': str(self.o2.currentText()), 
+						'operation index': self.o2.currentIndex(),
+						'gval': -1.0,
+						}
+		else: 
+			plotInfo = {'title': title,
+						'x axis': str(self.x1.currentText()), 
+						'x index': self.x1.currentIndex(),
+						'y axis': str(self.y1.currentText()), 
+						'y index': self.y1.currentIndex(),
+						'y axis 2': str(self.y3.currentText()),
+						'y index 2': self.y3.currentIndex(),
+						'operation': str(self.o2.currentText()), 
+						'operation index': self.o2.currentIndex(),
+						'gval':float(self.gainInput2.text().replace(" ","")),
+						}
 		self.plot1DInfo[self.num1Plots] = plotInfo
 		
-		for i in range(0, 3):
+		for i in range(0, 6):
 			self.onePlots.setItem(self.onePlots.rowCount() - 1, i, newItems[i])
 		self.formatTable(1)
 		
 	def add2DPlot(self):
-		lbl, xAx, yAx, zAx = QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem()
+		lbl, xAx, yAx, zAx, o, zAx2, gval= QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem(), QtWidgets.QTableWidgetItem()
 		self.twoPlots.insertRow(self.twoPlots.rowCount())
-		
 		self.num2Plots += 1
 		title = 'Plot '+ str(self.num2Plots)
 		
@@ -1963,21 +2913,48 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 		xAx.setText(self.x2.currentText())
 		yAx.setText(self.y2.currentText())
 		zAx.setText(self.z2.currentText())
+		o.setText(self.o1.currentText())
+		zAx2.setText(self.z3.currentText())
+		gval.setText(self.gainInput.text())
+		print(gval)
+		if gval == "":
+			gval = -1.0
+		#gval = setText(self.())
 		
-		newItems = [lbl, xAx, yAx, zAx]
-		
-		plotInfo = {'title': title,
+		newItems = [lbl, xAx, yAx, zAx, o, zAx2, gval]
+		if self.gainInput.text().replace(" ","")=="" or self.gainInput.text().replace(" ","")=="0":
+			plotInfo = {'title': title,
 					'x axis': str(self.x2.currentText()), 
 					'x index': self.x2.currentIndex(),
 					'y axis': str(self.y2.currentText()), 
 					'y index': self.y2.currentIndex(),
 					'z axis': str(self.z2.currentText()), 
 					'z index': self.z2.currentIndex(),
+					'operation': str(self.o1.currentText()), 
+					'operation index': self.o1.currentIndex(),
+					'z axis 2': str(self.z3.currentText()), 
+					'z index 2': self.z3.currentIndex(),
+					'gval': -1.0,
 					}
+		else:
+			plotInfo = {'title': title,
+					'x axis': str(self.x2.currentText()), 
+					'x index': self.x2.currentIndex(),
+					'y axis': str(self.y2.currentText()), 
+					'y index': self.y2.currentIndex(),
+					'z axis': str(self.z2.currentText()), 
+					'z index': self.z2.currentIndex(),
+					'operation': str(self.o1.currentText()), 
+					'operation index': self.o1.currentIndex(),
+					'z axis 2': str(self.z3.currentText()), 
+					'z index 2': self.z3.currentIndex(),
+					'gval': float(self.gainInput.text().replace(" ","")),
+					}
+		
 		
 		self.plot2DInfo[self.num2Plots] = plotInfo
 		
-		for i in range(0, 4):
+		for i in range(0, 7):
 			self.twoPlots.setItem(self.twoPlots.rowCount() - 1, i, newItems[i])
 		self.formatTable(2)
 		
@@ -2006,7 +2983,14 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 		vars =	  yield self.dv.variables()
 		self.indVars = vars[0]
 		self.depVars = vars[1]
+		self.non = [("None","")]
+		self.operations = options = [("+",""),("-",""),("*",""),("/","")]
+		print(vars[0]) #for debugging
 		
+		for var in self.non:
+			self.y3.addItem(str(var[0]))
+			self.z3.addItem(str(var[0]))
+
 		for var in self.indVars:
 			self.x2.addItem(str(var[0]))
 			self.y2.addItem(str(var[0]))
@@ -2014,6 +2998,8 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 			
 			self.z2.addItem(str(var[0]))
 			self.y1.addItem(str(var[0]))
+			self.z3.addItem(str(var[0]))
+			self.y3.addItem(str(var[0]))
 		
 		for var in self.depVars:
 			self.x2.addItem(str(var[0]))
@@ -2022,7 +3008,15 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 
 			self.z2.addItem(str(var[0]))
 			self.y1.addItem(str(var[0]))
-			
+			self.z3.addItem(str(var[0]))
+			self.y3.addItem(str(var[0]))
+		
+		for var in self.operations[::-1]:
+			self.o1.addItem(str(var[0]))
+			self.o2.addItem(str(var[0]))
+		
+		
+
 	@inlineCallbacks
 	def initPlot(self, c = None):
 		
@@ -2418,8 +3412,14 @@ class dataVaultExplorer(QtWidgets.QDialog, Ui_DataVaultExp):
 	def closeEvent(self, e):
 		self.close()
 
+def add_custom_gradients():
+    Gradients['RdBu'] = {'ticks':[(0, (8,1,83,255)),(0.5,(255,255,255,255)), (1.0, (126,17,7,255))], 'mode': 'rgb'}
+    Gradients['PuRd'] = {'ticks': [(0, (255, 255, 255, 255)),(0.5, (128, 0, 128, 255)), (1.0, (255, 0, 0, 255))], 'mode': 'rgb'}
+
+
 if __name__ == "__main__":
 	global app
+	add_custom_gradients() #to add more color gradients
 	app = QtWidgets.QApplication([])
 	import qt5reactor as pyqt5reactor
 	pyqt5reactor.install()
