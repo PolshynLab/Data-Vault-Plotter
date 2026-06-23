@@ -12,12 +12,19 @@ The plotter has three main functions, all of which can be accessed from the soft
  
  Live Plotting from an existing file:
  - Opens a Data Vault explorer that allows the user to select any existing Data Vault file to live-plot from. Once a data set is selected , the user is prompted to specify any 2D and 1D plots they would like to view as data is added to the file
+ - Plot titles include the leading Data Vault file number so multiple live plot windows can be matched to their source data set
  
  Plot Saved Data:
- - Allows the user to browse all available data sets in the Vault and select a file to plot from. The user is then prompted to specify any 2D plots they would like to generate from the selected file.
+ - Allows the user to browse all available data sets in the Vault and select a file to plot from. The user is then prompted to specify any 2D and/or 1D plots they would like to generate from the selected file.
+ - Plot titles include the leading Data Vault file number so multiple saved plot windows can be matched to their source data set
  - Line cuts can be plotted from any 2D plot
  - Both 2D plots and 1D line cuts can be saved as MATLAB files
- - Notes can be added to the plots in an integrated Notepad and the notes, along with either the full 2D plot or a line cut, can be saved as a PDF
+ - Notes can be added to the plots in an integrated Notepad
+ 
+ Plot Setup:
+ - 1D and 2D plots can be created directly from one measured quantity, or from an arithmetic operation between two measured quantities
+ - Supported operations are addition, subtraction, multiplication, and division
+ - An optional gain can be applied to the plotted quantity
  
 # Adding Data Vault Parameters to Enable Plotting:
 
@@ -37,7 +44,3 @@ To auto-start plots when your Data Vault file is created, add a parameter 'live_
 For example, the following line will autostart a 2D plot of 'C_v' vs. 'n0' and 'p0', a 2D plot of 'V' vs. 'p0' and 'n0', and a 1D plot of 'T' vs. 'p0':
 
 dv.add_parameter('live_plots', (('n0', 'p0', 'C_v'), ('p0', 'T'), ('p0', 'n0', 'V')))
-
-If you want to only auto-start 1 plot, do NOT place the tuple inside a list. For instance if you ONLY want to plot 'C_v' vs. 'n0' and 'p0' add the parameter
-
-dv.add_parameter('live_plots', ('n0', 'p0', 'C_v'))
