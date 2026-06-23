@@ -41,6 +41,18 @@ Ui_PlotSetup, QtBaseClass = uic.loadUiType(plotSetupUI)
 
 ID_NEWDATA = 999
 
+def addFileNumberToTitle(fileName, title):
+	fileName = str(fileName)
+	fileNumber = ''
+	for char in fileName:
+		if char.isdigit():
+			fileNumber += char
+		else:
+			break
+	if fileNumber == '':
+		return title
+	return fileNumber + ' - ' + title
+
 class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 	def __init__(self, reactor, parent = None):
 		super(dvPlotter, self).__init__(parent)
@@ -458,6 +470,7 @@ class plot2DWindow(QtWidgets.QDialog):
 						self.plotTitle = self.plotInfo['z axis'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis'] + ", gain = "+ str(self.plotInfo['gval'])
 					else: 
 						self.plotTitle = self.plotInfo['z axis'] + self.plotInfo['operation'] + self.plotInfo['z axis 2'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis'] + ", gain = "+ str(self.plotInfo['gval'])	
+			self.plotTitle = addFileNumberToTitle(self.fileName, self.plotTitle)
 			self.setWindowTitle(self.plotTitle)
 
 			self.Data = np.array([])
@@ -472,6 +485,25 @@ class plot2DWindow(QtWidgets.QDialog):
 			print(inst)
 			print('Error thrown on line: ')
 			print(sys.exc_traceback.tb_lineno) 
+
+	def updatePlotData(self, newData, x_ind, y_ind, z_ind, z2_ind = None):
+		xInd = newData[::, x_ind].astype(int)
+		yInd = newData[::, y_ind].astype(int)
+		if z2_ind == None:
+			zVals = newData[::, z_ind]
+		elif self.oIndex == 0:
+			zVals = newData[::, z_ind] + newData[::, z2_ind]
+		elif self.oIndex == 1:
+			zVals = newData[::, z_ind] - newData[::, z2_ind]
+		elif self.oIndex == 2:
+			zVals = newData[::, z_ind] * newData[::, z2_ind]
+		elif self.oIndex == 3:
+			zVals = np.divide(newData[::, z_ind], newData[::, z2_ind], out=np.zeros_like(newData[::, z_ind], dtype=float), where=newData[::, z2_ind]!=0)
+		else:
+			return
+		if self.gval != -1:
+			zVals = zVals * self.gval
+		self.plotData[xInd, yInd] = zVals
 		
 	@inlineCallbacks
 	def setupListener(self, c):
@@ -501,9 +533,7 @@ class plot2DWindow(QtWidgets.QDialog):
 						print(newData[::, x_ind])
 						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
-
-						for pt in newData:
-							self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]
+						self.updatePlotData(newData, x_ind, y_ind, z_ind)
 						
 						self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 						self.isData = True
@@ -519,18 +549,7 @@ class plot2DWindow(QtWidgets.QDialog):
 						print(newData[::, x_ind])
 						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
-
-						for pt in newData:
-							if self.oIndex == 0:
-								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]+pt[z2_ind]
-							elif self.oIndex == 1:
-								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]-pt[z2_ind]
-							elif self.oIndex == 2:
-								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]*pt[z2_ind]
-							elif self.oIndex == 3:
-								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = np.divide(pt[z_ind], pt[z2_ind], out=np.zeros_like(pt[z_ind], dtype=float), where=pt[z2_ind]!=0)
-							else:
-								pass
+						self.updatePlotData(newData, x_ind, y_ind, z_ind, z2_ind)
 						self.z2Index +=1
 						self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 						self.isData = True
@@ -545,9 +564,7 @@ class plot2DWindow(QtWidgets.QDialog):
 						print(newData[::, x_ind])
 						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
-
-						for pt in newData:
-							self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]*self.gval
+						self.updatePlotData(newData, x_ind, y_ind, z_ind)
 						
 						self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 						self.isData = True
@@ -563,18 +580,7 @@ class plot2DWindow(QtWidgets.QDialog):
 						print(newData[::, x_ind])
 						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
-
-						for pt in newData:
-							if self.oIndex == 0:
-								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (pt[z_ind]+pt[z2_ind])*self.gval
-							elif self.oIndex == 1:
-								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (pt[z_ind]-pt[z2_ind])*self.gval
-							elif self.oIndex == 2:
-								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (pt[z_ind]*pt[z2_ind])*self.gval
-							elif self.oIndex == 3:
-								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (np.divide(pt[z_ind], pt[z2_ind], out=np.zeros_like(pt[z_ind], dtype=float), where=pt[z2_ind]!=0))*self.gval
-							else:
-								pass
+						self.updatePlotData(newData, x_ind, y_ind, z_ind, z2_ind)
 						self.z2Index +=1
 						self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 						self.isData = True	
@@ -671,11 +677,9 @@ class plot2DWindow(QtWidgets.QDialog):
 						print(newData[::, x_ind])
 						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
-
-						for pt in newData:
-							self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]
+						self.updatePlotData(newData, x_ind, y_ind, z_ind)
 						yield self.sleep(0.1)
-						self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+						self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, autoHistogramRange = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 						self.isData = True
 					else:
 						self.z2Index -=1
@@ -689,21 +693,10 @@ class plot2DWindow(QtWidgets.QDialog):
 						print(newData[::, x_ind])
 						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
-
-						for pt in newData:
-							if self.oIndex == 0:
-								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]+pt[z2_ind]
-							elif self.oIndex == 1:
-								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]-pt[z2_ind]
-							elif self.oIndex == 2:
-								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]*pt[z2_ind]
-							elif self.oIndex == 3:
-								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = np.divide(pt[z_ind], pt[z2_ind], out=np.zeros_like(pt[z_ind], dtype=float), where=pt[z2_ind]!=0)
-							else:
-								pass
+						self.updatePlotData(newData, x_ind, y_ind, z_ind, z2_ind)
 						yield self.sleep(0.1)
 						self.z2Index +=1
-						self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+						self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, autoHistogramRange = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 						self.isData = True
 				else: 
 					if self.z2Index == 0:
@@ -716,11 +709,9 @@ class plot2DWindow(QtWidgets.QDialog):
 						print(newData[::, x_ind])
 						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
-
-						for pt in newData:
-							self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]*self.gval
+						self.updatePlotData(newData, x_ind, y_ind, z_ind)
 						yield self.sleep(0.1)
-						self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels =False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+						self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, autoHistogramRange = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 						self.isData = True
 					else:
 						self.z2Index -=1
@@ -734,21 +725,10 @@ class plot2DWindow(QtWidgets.QDialog):
 						print(newData[::, x_ind])
 						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
-
-						for pt in newData:
-							if self.oIndex == 0:
-								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (pt[z_ind]+pt[z2_ind])*self.gval
-							elif self.oIndex == 1:
-								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (pt[z_ind]-pt[z2_ind])*self.gval
-							elif self.oIndex == 2:
-								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (pt[z_ind]*pt[z2_ind])*self.gval
-							elif self.oIndex == 3:
-								self.plotData[int(pt[x_ind]), int(pt[y_ind])] = (np.divide(pt[z_ind], pt[z2_ind], out=np.zeros_like(pt[z_ind], dtype=float), where=pt[z2_ind]!=0))*self.gval
-							else:
-								pass
+						self.updatePlotData(newData, x_ind, y_ind, z_ind, z2_ind)
 						yield self.sleep(0.1)
 						self.z2Index +=1
-						self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
+						self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, autoHistogramRange = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 						self.isData = True
 			end = time.time()
 			print(end-start)
@@ -850,8 +830,7 @@ class plot2DWindow(QtWidgets.QDialog):
 	def plotMore(self, newData, x_ind, y_ind, z_ind, c):
 		yield self.sleep(0.1)
 
-		for pt in newData:
-				self.plotData[int(pt[x_ind]), int(pt[y_ind])] = pt[z_ind]
+		self.updatePlotData(newData, x_ind, y_ind, z_ind)
 
 		self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 
@@ -883,8 +862,6 @@ class plot1DWindow(QtWidgets.QDialog):
 		self.numLines = 1
 		self.Data = np.array([])
 		self.plotTitle = self.plotInfo['title']
-		
-		self.setWindowTitle(self.plotTitle)
 		self.xIndex = self.plotInfo['x index']
 		self.yIndex = self.plotInfo['y index']
 		self.y2Index = self.plotInfo['y index 2']
@@ -925,6 +902,8 @@ class plot1DWindow(QtWidgets.QDialog):
 			else:
 				if self.plotTitle[0:5] == 'Plot ':
 					self.plotTitle = self.plotInfo['y axis']+"+"+self.plotInfo['y axis 2'] + ' vs. ' + self.plotInfo['x axis'] + " , gain = "+ str(self.gvalue)
+		self.plotTitle = addFileNumberToTitle(self.fileName, self.plotTitle)
+		self.setWindowTitle(self.plotTitle)
 		
 		self.setupPlot()
 		self.setupListener(self.reactor)
@@ -1021,6 +1000,47 @@ class plot1DWindow(QtWidgets.QDialog):
 		self.traceCntBox.setStyleSheet(self.traceCntStyle+self.styleColorTxt)
 		self.traceCnt = int(i)
 		print('Trace Count: ', self.traceCnt)
+
+	def getProcessedYVals(self, data, y_ind, y2_ind = None):
+		if y2_ind == None:
+			yVals = data[::, y_ind]
+		elif self.oIndex == 3:
+			yVals = np.divide(data[::, y_ind], data[::, y2_ind], out=np.zeros_like(data[::, y_ind], dtype=float), where=data[::, y2_ind]!=0)
+		elif self.oIndex == 2:
+			yVals = data[::, y_ind] * data[::, y2_ind]
+		elif self.oIndex == 1:
+			yVals = data[::, y_ind] - data[::, y2_ind]
+		else:
+			yVals = data[::, y_ind] + data[::, y2_ind]
+
+		if self.gvalue != -1:
+			yVals = yVals * self.gvalue
+		return yVals
+
+	def plotTraces(self, x_ind, y_ind, y2_ind = None):
+		xAll = self.Data[::, x_ind]
+		yAll = self.getProcessedYVals(self.Data, y_ind, y2_ind)
+		if len(xAll) == 0:
+			return
+
+		segments = [[0, len(xAll)]]
+		if len(self.binned) > 2:
+			breaks = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0]).flatten()
+			if len(breaks) != 0:
+				starts = [0] + list(breaks + 1)
+				ends = list(breaks + 1) + [len(xAll)]
+				segments = [[starts[i], ends[i]] for i in range(0, len(starts)) if starts[i] < ends[i]]
+
+		self.numLines = len(segments)
+		linesToPlot = segments[-(self.traceCnt + 1):]
+		self.plot1D.clear()
+		for i, segment in enumerate(reversed(linesToPlot)):
+			start, end = segment
+			if i == 0:
+				pen = pg.mkPen(color=self.penColor)
+			else:
+				pen = pg.mkPen(color=self.colorWheel[int(self.id+i)%5])
+			self.plot1D.plot(x = xAll[start:end], y = yAll[start:end], pen = pen)
 	
 	@inlineCallbacks
 	def setupListener(self, c):
@@ -1037,6 +1057,7 @@ class plot1DWindow(QtWidgets.QDialog):
 			newData = yield self.dv.get()
 			
 			if len(newData[0]) != 0:
+				y2_ind = None
 				if self.gvalue ==-1:
 					if self.y2Index ==0:
 						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex])
@@ -1262,9 +1283,7 @@ class plot1DWindow(QtWidgets.QDialog):
 							
 						else:
 							xVals, yVals = newData[::, x_ind], (newData[::, y_ind]+newData[::, y2_ind])*self.gvalue
-
-				self.plot1D.clear()
-				self.plot1D.plot(x = xVals, y = yVals, pen =pg.mkPen(color=self.penColor))
+				self.plotTraces(x_ind, y_ind, y2_ind)
 			
 		except Exception as inst:
 			print('Following error was thrown: ')
@@ -1283,6 +1302,8 @@ class plot1DWindow(QtWidgets.QDialog):
 		try:
 			newData = yield self.dv.get()
 			if len(newData[0]) != 0:
+				oldData = copy.copy(self.Data)
+				y2_ind = None
 				if self.gvalue ==-1:
 					if self.y2Index ==0:
 						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex])
@@ -1508,8 +1529,10 @@ class plot1DWindow(QtWidgets.QDialog):
 						else:
 							xVals, yVals = newData[::, x_ind], (newData[::, y_ind]+newData[::, y2_ind])*self.gvalue
 				yield self.sleep(0.1)
-				self.plot1D.clear()
-				self.plot1D.plot(x = xVals, y = yVals, pen =pg.mkPen(color=self.penColor))
+				if len(oldData) != 0:
+					self.Data = np.vstack((oldData, self.Data))
+					self.binned = np.digitize(self.Data[::, x_ind], self.xBins) - 1
+				self.plotTraces(x_ind, y_ind, y2_ind)
 		except Exception as inst:
 			print('Following error was thrown: ')
 			print(inst)
@@ -1604,6 +1627,8 @@ class plotSaved1DWindow(QtWidgets.QWidget):
 			else:
 				if self.plotTitle[0:5] == 'Plot ':
 					self.plotTitle = self.yAxis + self.o + self.y2Axis + ' vs. ' + self.xAxis + " ,gain = " + str(self.gain)
+		self.plotTitle = addFileNumberToTitle(self.file, self.plotTitle)
+		self.setWindowTitle(self.plotTitle)
 		self.pdfNum = 1
 		
 		self.resize(675,330)
@@ -1742,7 +1767,7 @@ class plotSaved1DWindow(QtWidgets.QWidget):
 				self.Data = np.delete(self.Data, inx, axis = 1)
 				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
 				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.y2_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.y2_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
 				self.xVals, self.yVals = self.Data[::, self.x_ind], (np.divide(self.Data[::, self.y_ind], self.Data[::, self.y2_ind], out=np.zeros_like(self.Data[::, self.y_ind], dtype=float), where=self.Data[::, self.y2_ind]!=0))
 			elif self.oIndex == 2: 
 				self.y2Index -=1
@@ -1751,7 +1776,7 @@ class plotSaved1DWindow(QtWidgets.QWidget):
 				self.Data = np.delete(self.Data, inx, axis = 1)
 				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
 				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.y2_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.y2_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
 				self.xVals, self.yVals = self.Data[::, self.x_ind], self.Data[::, self.y_ind]*self.Data[::, self.y2_ind]
 			elif self.oIndex == 1: 
 				self.y2Index -=1
@@ -1760,7 +1785,7 @@ class plotSaved1DWindow(QtWidgets.QWidget):
 				self.Data = np.delete(self.Data, inx, axis = 1)
 				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
 				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.y2_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.y2_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
 				self.xVals, self.yVals = self.Data[::, self.x_ind], self.Data[::, self.y_ind]-self.Data[::, self.y2_ind]
 			else: 
 				self.y2Index -=1
@@ -1769,7 +1794,7 @@ class plotSaved1DWindow(QtWidgets.QWidget):
 				self.Data = np.delete(self.Data, inx, axis = 1)
 				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
 				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.y2_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.y2_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
 				self.xVals, self.yVals = self.Data[::, self.x_ind], self.Data[::, self.y_ind]+self.Data[::, self.y2_ind]
 		else:
 			if self.y2Index == 0:
@@ -1786,7 +1811,7 @@ class plotSaved1DWindow(QtWidgets.QWidget):
 				self.Data = np.delete(self.Data, inx, axis = 1)
 				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
 				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.y2_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.y2_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
 				self.xVals, self.yVals = self.Data[::, self.x_ind], (np.divide(self.Data[::, self.y_ind], self.Data[::, self.y2_ind], out=np.zeros_like(self.Data[::, self.y_ind], dtype=float), where=self.Data[::, self.y2_ind]!=0))*self.gain
 			elif self.oIndex == 2: 
 				self.y2Index -=1
@@ -1795,7 +1820,7 @@ class plotSaved1DWindow(QtWidgets.QWidget):
 				self.Data = np.delete(self.Data, inx, axis = 1)
 				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
 				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.y2_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.y2_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
 				self.xVals, self.yVals = self.Data[::, self.x_ind], self.Data[::, self.y_ind]*self.Data[::, self.y2_ind]*self.gain
 			elif self.oIndex == 1: 
 				self.y2Index -=1
@@ -1804,7 +1829,7 @@ class plotSaved1DWindow(QtWidgets.QWidget):
 				self.Data = np.delete(self.Data, inx, axis = 1)
 				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
 				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.y2_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.y2_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
 				self.xVals, self.yVals = self.Data[::, self.x_ind], (self.Data[::, self.y_ind]-self.Data[::, self.y2_ind])*self.gain
 			else: 
 				self.y2Index -=1
@@ -1813,7 +1838,7 @@ class plotSaved1DWindow(QtWidgets.QWidget):
 				self.Data = np.delete(self.Data, inx, axis = 1)
 				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
 				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.y2_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
+				self.y2_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
 				self.xVals, self.yVals = self.Data[::, self.x_ind], (self.Data[::, self.y_ind]+self.Data[::, self.y2_ind])*self.gain
 		
 		self.plot1D.plot(x = self.xVals, y = self.yVals, pen =pg.mkPen(color=self.penColor))
@@ -1979,6 +2004,8 @@ class plotSaved2DWindow(QtWidgets.QWidget):
 					self.plotTitle = self.plotInfo['z axis'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis'] + ", gain = "+ str(self.plotInfo['gval'])
 				else: 
 					self.plotTitle = self.plotInfo['z axis'] + self.plotInfo['operation'] + self.plotInfo['z axis 2'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis'] + ", gain = "+ str(self.plotInfo['gval'])	
+		self.plotTitle = addFileNumberToTitle(self.file, self.plotTitle)
+		self.setWindowTitle(self.plotTitle)
 		self.pdfNum = 1
 		self.resize(800,800)
 		self.move(450, yMovePos)
@@ -2280,46 +2307,21 @@ class plotSaved2DWindow(QtWidgets.QWidget):
 		try:
 			self.Data[::, self.x_ind] = np.digitize(self.Data[::, self.x_ind], self.xBins)-1
 			self.Data[::, self.y_ind] = np.digitize(self.Data[::, self.y_ind], self.yBins)-1
-			if self.gain == -1 or self.gain == 0:
-				if self.z2Index == 0:
-					for cell in self.Data:
-						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]
-				elif self.oIndex == 3:
-					#self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
-					for cell in self.Data:
-						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = np.divide(cell[self.z_ind], cell[self.z2_ind], out=np.zeros_like(cell[self.z_ind], dtype=float), where=cell[self.z2_ind]!=0)
-				elif self.oIndex == 2:
-					#self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
-					for cell in self.Data:
-						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]*cell[self.z2_ind]
-				elif self.oIndex == 1:
-					#self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
-					for cell in self.Data:
-						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]*cell[self.z2_ind]
-				else:
-					#self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
-					for cell in self.Data:
-						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]*cell[self.z2_ind]
+			xInd = self.Data[::, self.x_ind].astype(int)
+			yInd = self.Data[::, self.y_ind].astype(int)
+			if self.z2Index == 0:
+				zVals = self.Data[::, self.z_ind]
+			elif self.oIndex == 3:
+				zVals = np.divide(self.Data[::, self.z_ind], self.Data[::, self.z2_ind], out=np.zeros_like(self.Data[::, self.z_ind], dtype=float), where=self.Data[::, self.z2_ind]!=0)
+			elif self.oIndex == 2:
+				zVals = self.Data[::, self.z_ind] * self.Data[::, self.z2_ind]
+			elif self.oIndex == 1:
+				zVals = self.Data[::, self.z_ind] - self.Data[::, self.z2_ind]
 			else:
-				if self.z2Index == 0:
-					for cell in self.Data:
-						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]*self.gain
-				elif self.oIndex == 3:
-					#self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
-					for cell in self.Data:
-						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = np.divide(cell[self.z_ind], cell[self.z2_ind], out=np.zeros_like(cell[self.z_ind], dtype=float), where=cell[self.z2_ind]!=0)*self.gain
-				elif self.oIndex == 2:
-					#self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
-					for cell in self.Data:
-						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = cell[self.z_ind]*cell[self.z2_ind]*self.gain
-				elif self.oIndex == 1:
-					#self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
-					for cell in self.Data:
-						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = (cell[self.z_ind] - cell[self.z2_ind])*self.gain
-				else:
-					#self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
-					for cell in self.Data:
-						self.plotData[int(cell[self.x_ind]), int(cell[self.y_ind])] = (cell[self.z_ind] + cell[self.z2_ind])*self.gain
+				zVals = self.Data[::, self.z_ind] + self.Data[::, self.z2_ind]
+			if self.gain != -1 and self.gain != 0:
+				zVals = zVals * self.gain
+			self.plotData[xInd, yInd] = zVals
 		except Exception as inst:
 			print('Following error was thrown: ')
 			print(inst)
