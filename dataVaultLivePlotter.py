@@ -16,6 +16,8 @@ import pyqtgraph.exporters
 import time
 import copy
 import datetime as dt
+import traceback
+from numbers import Real
 import scipy.io as sio
 import scipy.stats as spst
 from pyqtgraph.graphicsItems.GradientEditorItem import Gradients
@@ -40,6 +42,96 @@ Ui_EditDataInfo, QtBaseClass = uic.loadUiType(editInfoGUI)
 Ui_PlotSetup, QtBaseClass = uic.loadUiType(plotSetupUI)
 
 ID_NEWDATA = 999
+SAVED_DATA_BATCH_SIZE = 10000
+AUTO_PLOT_RETRY_INTERVAL = 0.5
+AUTO_PLOT_METADATA_TIMEOUT = 10.0
+
+
+class MissingPlotMetadata(ValueError):
+	pass
+
+
+def livePlotSettings(spec, params, variables):
+	"""Translate one live_plots entry into the settings used by manual plots."""
+	if not isinstance(spec, (tuple, list)) or len(spec) not in (2, 3):
+		raise ValueError('expected (x, quantity) or (x, y, quantity)')
+	names = [var[0] for group in variables for var in group]
+
+	def column(name):
+		if not isinstance(name, str) or names.count(name) != 1:
+			raise ValueError('unknown or ambiguous variable: {!r}'.format(name))
+		return names.index(name)
+
+	quantity = spec[-1]
+	second, operation, gain, gainEnabled = None, '/', 1.0, False
+	if isinstance(quantity, str):
+		first = quantity
+	elif isinstance(quantity, (tuple, list)) and len(quantity) in (2, 3, 4):
+		first = quantity[0]
+		if len(quantity) == 2:
+			gain, gainEnabled = quantity[1], True
+		else:
+			operation, second = quantity[1:3]
+			if not isinstance(operation, str) or operation not in ('+', '-', '*', '/'):
+				raise ValueError('operation must be +, -, * or /')
+			column(second)
+			if len(quantity) == 4:
+				gain, gainEnabled = quantity[3], True
+	else:
+		raise ValueError('invalid quantity specification')
+	if isinstance(gain, (bool, np.bool_)) or not isinstance(gain, Real) or not np.isfinite(gain):
+		raise ValueError('gain must be a finite real number')
+
+	dimension = len(spec) - 1
+	signalAxis = 'y' if dimension == 1 else 'z'
+	info = {'title': 'Plot 1', 'operation': operation,
+		'operation index': ('/', '*', '-', '+').index(operation),
+		'gval': float(gain), 'gain enabled': gainEnabled,
+		signalAxis + ' axis': first, signalAxis + ' index': column(first),
+		signalAxis + ' axis 2': second if second is not None else 'None',
+		signalAxis + ' index 2': column(second) + 1 if second is not None else 0}
+	for axis, name in zip(('x', 'y'), spec[:-1]):
+		info[axis + ' axis'] = name
+		info[axis + ' index'] = column(name)
+	missing = []
+	for axis, name in zip(('x', 'y'), spec[:-1]):
+		rangeKey, pointsKey = name + '_rng', name + '_pnts'
+		missing.extend(key for key in (rangeKey, pointsKey) if key not in params)
+		if rangeKey in params:
+			try:
+				extent = np.asarray(params[rangeKey], dtype=float)
+			except (TypeError, ValueError):
+				raise ValueError(rangeKey + ' must contain two finite, distinct endpoints')
+			if extent.shape != (2,) or not np.all(np.isfinite(extent)) or extent[0] == extent[1]:
+				raise ValueError(rangeKey + ' must contain two finite, distinct endpoints')
+			info[axis + ' range'] = tuple(extent)
+		if pointsKey in params:
+			points = params[pointsKey]
+			if (isinstance(points, (bool, np.bool_)) or not isinstance(points, Real)
+				or not np.isfinite(points) or points < 1 or int(points) != points):
+				raise ValueError(pointsKey + ' must be a positive integer')
+			info[axis + ' points'] = int(points)
+	if missing:
+		raise MissingPlotMetadata('missing ' + ', '.join(missing))
+	return dimension, info
+
+
+def parseLivePlots(params, variables):
+	"""Keep ready plots, missing metadata and invalid entries separate."""
+	onePlots, twoPlots, pending, errors = {}, {}, {}, {}
+	specs = params['live_plots']
+	if not isinstance(specs, (tuple, list)):
+		return twoPlots, onePlots, pending, {0: 'live_plots must be a tuple of plot tuples'}
+	for number, spec in enumerate(specs, 1):
+		try:
+			dimension, info = livePlotSettings(spec, params, variables)
+			info['title'] = 'Plot ' + str(number)
+			(twoPlots if dimension == 2 else onePlots)[number] = info
+		except MissingPlotMetadata as error:
+			pending[number] = str(error)
+		except ValueError as error:
+			errors[number] = str(error)
+	return twoPlots, onePlots, pending, errors
 
 def addFileNumberToTitle(fileName, title):
 	fileName = str(fileName)
@@ -56,7 +148,6 @@ def addFileNumberToTitle(fileName, title):
 class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 	def __init__(self, reactor, parent = None):
 		super(dvPlotter, self).__init__(parent)
-		QtWidgets.QMainWindow.__init__(self)
 		print("\n called dvPlotter \n")
 		self.setupUi(self)
 		self.reactor = reactor
@@ -81,6 +172,10 @@ class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 		self.savePlotList = []
 		
 		self.listenTo = ['']
+		self._watchGeneration = 0
+		self._watchReady = False
+		self._directoryListenerAdded = False
+		self._autoPlotDatasets = set()
 		
 	def moveDefault(self):
 		print("\n called moveDefault \n")
@@ -101,14 +196,17 @@ class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 	@inlineCallbacks
 	def initListener(self, c):
 		print("\n called initListener \n")
-		if self.listStatus == False:
-			self.listen.clicked.disconnect()
-			self.changeDir.clicked.connect(self.setupListener)
-		
 		try:
-			yield self.dv.signal__new_dataset(0o0001)
-			yield self.dv.addListener(listener=self.open_dataset, source=None, ID=0o0001)
+			self._watchReady = False
+			if not self._directoryListenerAdded:
+				yield self.dv.signal__new_dataset(0o0001)
+				yield self.dv.addListener(listener=self.open_dataset, source=None, ID=0o0001)
+				self._directoryListenerAdded = True
 			yield self.dv.cd(self.listenTo)
+			if not self.listStatus:
+				self.listen.clicked.disconnect()
+				self.changeDir.clicked.connect(self.setupListener)
+			self._watchReady = True
 			self.plotLive.setEnabled(True)
 			self.listen.setText('Listening!')
 			self.changeDir.setEnabled(True)
@@ -127,131 +225,108 @@ class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 			pressStr = press + "{color: rgb(0,0,0); background-color:rgb(200,60,0);border: 2px solid rgb(200,60,0);border-radius: 5px}" 
 			style = regStr + " " + pressStr
 			self.changeDir.setStyleSheet(style)
-		except:
-			print('Either no LabRad connection or DataVault connection.')
+		except Exception:
+			print('Could not start the Data Vault directory listener.')
+			traceback.print_exc()
 
 	@inlineCallbacks
 	def update(self, c):
 		yield self.sleep(0.5)
 		
+	def _watchIsCurrent(self, generation):
+		return self._watchReady and generation == self._watchGeneration
+
 	@inlineCallbacks
 	def open_dataset(self, c, signal):
-		print("\n called open_dataset \n")
-		print('signal: ', signal)
-		self.listenPlotFile =  signal
-		yield self.dv.open(str(self.listenPlotFile))
-		yield self.sleep(0.5)
-		params = yield self.dv.get_parameters()
-		#print(params) #for debugging purposes
-		vars = yield self.dv.variables()
-		if  params != None:
-			params = dict((x,y) for x,y in params)	
-			parKeys = list(params.keys())
-			#print("\n\n\n",parKeys) #for debugging
-			if 'live_plots' in parKeys:
-				print('init live plots')
-				self.initLivePlotting(params, vars)
-			else:
-				pass
-		else:
-			pass
-			'''
-			self.setupListenPlot = plotSetup(self.reactor, signal, self.listenTo, self.cxn, self.dv, 0, self)
-			self.setupListenPlot.show()
-			'''
-			
-	@inlineCallbacks
-	def initLivePlotting(self, params, vars, c = None):
-		print("\n called initLivePlotting \n")
-		print('Live Plots: ', params['live_plots'])
-		plot1DDict, plot2DDict = {}, {}
-		missingInfo = False
-		toPlot = params['live_plots']
-		#print('\n\n Bruh! \n\n To Plot \n\n: ', toPlot)
-		indVars, depVars = [x[0] for x in vars[0]], [x[0] for x in vars[1]]
-		print('Varialbes: ', vars)
-		for plot in toPlot:
-			if len(plot) == 2:
-				print(plot)
-				try:
-					title = str(plot[1]) + ' vs. ' + str(plot[0])
-					x_axis, y_axis = str(plot[0]), str(plot[1])
-					x_index, y_index = indVars.index(x_axis), depVars.index(y_axis)+len(indVars)
-					x_rng = params[x_axis + '_rng']
-					x_pnts = params[x_axis + '_pnts']
-					plot1DDict[title] = {'title' : title, 'x axis' : x_axis, 'y axis' : y_axis, 'x index' : x_index, 'y index' : y_index, 'x range' : x_rng, 'x points' : x_pnts}
-				except:
-					missingInfo = True
-			elif len(plot) == 3:
-				try:
-					if self.oIndex == 4:
-						title = str(plot[2]) + ' vs. ' + str(plot[0]) + ' and ' + str(plot[1])
-						x_axis, y_axis, z_axis = str(plot[0]), str(plot[1]), str(plot[2])
-						x_index, y_index, z_index = indVars.index(x_axis), indVars.index(y_axis), depVars.index(z_axis)+len(indVars)
-						x_rng = params[x_axis + '_rng']
-						x_pnts = params[x_axis + '_pnts']
-						y_rng = params[y_axis + '_rng']
-						y_pnts = params[y_axis + '_pnts']
-						plot2DDict[title] = {'title' : title, 'x axis' : x_axis, 'y axis' : y_axis, 'z axis' : z_axis, 'x index' : x_index, 'y index' : y_index, 'z index' : z_index , 'x range' : x_rng, 'x points' : x_pnts, 'y range' : y_rng, 'y points' : y_pnts}
-						print(title)
-					else:
-						title = str(plot[2]) + ' vs. ' + str(plot[0]) + ' and ' + str(plot[1])
-						x_axis, y_axis, z_axis = str(plot[0]), str(plot[1]), str(plot[2])
-						x_index, y_index, z_index = indVars.index(x_axis), indVars.index(y_axis), depVars.index(z_axis)+len(indVars)
-						x_rng = params[x_axis + '_rng']
-						x_pnts = params[x_axis + '_pnts']
-						y_rng = params[y_axis + '_rng']
-						y_pnts = params[y_axis + '_pnts']
-						plot2DDict[title] = {'title' : title, 'x axis' : x_axis, 'y axis' : y_axis, 'z axis' : z_axis, 'x index' : x_index, 'y index' : y_index, 'z index' : z_index , 'x range' : x_rng, 'x points' : x_pnts, 'y range' : y_rng, 'y points' : y_pnts}
-						print(title)
-				except:
-					missingInfo = True
-			else:
-				pass
-		print('1D Plots: ', plot1DDict)
-		print('2D Plots: ', plot2DDict)
-		if missingInfo == False:
-			print('Starting Auto-Plots...')
-			yield self.openLivePlots(plot2DDict, plot1DDict, 0, self.reactor)
-			yield self.sleep(0.5)
+		if not self._watchReady:
+			return
+		directory, file = list(self.listenTo), str(signal)
+		generation = self._watchGeneration
+		key = (tuple(directory), file)
+		if key in self._autoPlotDatasets:
+			return
+		self._autoPlotDatasets.add(key)
+		connection = None
+		try:
+			# A short-lived connection isolates this file from other dataset events.
+			from labrad.wrappers import connectAsync
+			deadline = self.reactor.seconds() + AUTO_PLOT_METADATA_TIMEOUT
+			connection = yield connectAsync(name='dvPlotter auto-start')
+			if not self._watchIsCurrent(generation):
+				return
+			dv = yield connection.data_vault
+			yield dv.cd(directory)
+			if not self._watchIsCurrent(generation):
+				return
+			yield dv.open(file)
+			variables = yield dv.variables()
+			handled = set()
+			while self._watchIsCurrent(generation):
+				params = dict((yield dv.get_parameters()) or [])
+				if not self._watchIsCurrent(generation):
+					return
+				pending = {}
+				if 'live_plots' in params:
+					twoPlots, onePlots, pending, errors = parseLivePlots(params, variables)
+					for number, error in errors.items():
+						if number not in handled:
+							print('{}: live_plots entry {}: {}'.format(file, number, error))
+							handled.add(number)
+					twoPlots = {n: info for n, info in twoPlots.items() if n not in handled}
+					onePlots = {n: info for n, info in onePlots.items() if n not in handled}
+					pending = {n: error for n, error in pending.items() if n not in handled}
+					handled.update(twoPlots)
+					handled.update(onePlots)
+					if twoPlots or onePlots:
+						yield self.openLivePlots(twoPlots, onePlots, 0,
+							directory=directory, file=file, generation=generation)
+						if not self._watchIsCurrent(generation):
+							return
+					if not pending:
+						return
+				remaining = deadline - self.reactor.seconds()
+				if remaining <= 0:
+					for number, error in pending.items():
+						print('{}: live_plots entry {}: {} (metadata timeout)'.format(file, number, error))
+					return
+				yield self.sleep(min(AUTO_PLOT_RETRY_INTERVAL, remaining))
+		except Exception:
+			if self._watchIsCurrent(generation):
+				print('Could not auto-start plots for {} in {}'.format(file, directory))
+				traceback.print_exc()
+		finally:
+			if connection is not None:
+				connection.disconnect()
 
-		else:
-			pass
-			'''
-			print '-------------------- Auto-start plots format is incorrect --------------------'
-			self.setupListenPlot = plotSetup(self.reactor, self.listenPlotFile, self.listenTo, self.cxn, self.dv, 0, self)
-			self.setupListenPlot.show()
-			'''
-	
-	def update_params(self):
-		pass
-		
-	def setListenDir(self, dir, list):
+	def setListenDir(self, dir, directory):
 		self.listenDir.setText(str(dir))
 		self.listenDir.setStyleSheet("QLabel#listenDir {color: rgb(131,131,131);}")
-		self.listenTo = list
-		
+		if self.listenTo != directory:
+			self._watchGeneration += 1
+			self._watchReady = False
+			self._autoPlotDatasets.clear()
+		self.listenTo = list(directory)
+
 	@inlineCallbacks
-	def openLivePlots(self, twoPlots, onePlots, fresh, c = None):
-		print("\n called openLivePlots \n")
-		try: 
-			x0, y0 = 450, 25
-			for plot in twoPlots:
-				self.new2DPlot = plot2DWindow(self.reactor, twoPlots[plot], self.listenTo, self.listenPlotFile, x0, y0, fresh, self)
-				self.new2DPlot.show()
+	def openLivePlots(self, twoPlots, onePlots, fresh, *, directory, file, generation=None):
+		# Snapshot the target before yielding between windows.
+		directory, file = list(directory), str(file)
+		for plots, windowClass, attribute, x0 in (
+			(twoPlots, plot2DWindow, 'new2DPlot', 450),
+			(onePlots, plot1DWindow, 'new1DPlot', 1250)):
+			y0 = 25
+			for info in plots.values():
+				if generation is not None and not self._watchIsCurrent(generation):
+					return
+				try:
+					window = windowClass(self.reactor, info, list(directory), file, x0, y0, fresh, self)
+					setattr(self, attribute, window)
+					window.show()
+				except Exception:
+					print('Could not open {} from {}'.format(info['title'], file))
+					traceback.print_exc()
 				yield self.sleep(1)
 				y0 += 50
-			x0, y0 = 1250, 25
-			for plot in onePlots:
-				self.new1DPlot = plot1DWindow(self.reactor, onePlots[plot], self.listenTo, self.listenPlotFile, x0, y0, fresh, self)
-				self.new1DPlot.show()
-				yield self.sleep(1)
-				y0 += 50
-		except Exception as inst:
-			print('Following error was thrown: ')
-			print(inst)
-			print('Error thrown on line: ')
-			print(sys.exc_traceback.tb_lineno)
 		self.allowPlot = True
 			
 	def openSavedPlots(self, file, dir, allPlots, dim):
@@ -262,8 +337,9 @@ class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 			for plot in allPlots:
 				try:
 					thing = plotSaved2DWindow(self.reactor, file, dir, allPlots[plot], y0)
-					thing.show()
 					self.savePlotList.append(thing)
+					thing.closed.connect(self.savePlotList.remove)
+					thing.show()
 					y0 += 50
 				except Exception as inst:
 					print('Following error was thrown: ')
@@ -275,8 +351,9 @@ class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 				try:
 					print('opening 1D plot', plot)
 					thing = plotSaved1DWindow(self.reactor, file, dir, allPlots[plot], y0, color0)
-					thing.show()
 					self.savePlotList.append(thing)
+					thing.closed.connect(self.savePlotList.remove)
+					thing.show()
 					y0 += 50
 					color0 += 1
 				except Exception as inst:
@@ -310,11 +387,15 @@ class dvPlotter(QtWidgets.QMainWindow, Ui_MainWin):
 		return d
 		
 	def closePlotter(self):
+		self._watchReady = False
+		self._watchGeneration += 1
 		self.reactor.stop()
 		self.cxn.disconnect()
 		self.close()
 
 	def closeEvent(self, e):
+		self._watchReady = False
+		self._watchGeneration += 1
 		self.reactor.stop()
 		self.cxn.disconnect()
 		print('Reactor shut down.')
@@ -428,7 +509,62 @@ class extentPrompt(QtWidgets.QDialog, Ui_ExtPrompt):
 	def closeEvent(self, e):
 		self.reject()
 
-class plot2DWindow(QtWidgets.QDialog):
+class livePlotWindow(QtWidgets.QDialog):
+	def __init__(self, parent=None):
+		super(livePlotWindow, self).__init__(parent)
+		self._closed = False
+		self._listenerAdded = False
+		self.cxn = None
+		self.dv = None
+		self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+
+	def closePlot(self):
+		if self._closed:
+			return
+		self._closed = True
+		if self._listenerAdded:
+			try:
+				self.dv.removeListener(listener=self.updatePlot, ID=self.id)
+			except KeyError:
+				pass
+			self._listenerAdded = False
+		if self.cxn is not None:
+			self.cxn.disconnect()
+			self.cxn = None
+		views = []
+		if hasattr(self, 'plot1D'):
+			views.append(self.plot1D.getViewBox())
+		if hasattr(self, 'mainPlot'):
+			views.extend([self.viewBig.getViewBox(), self.mainPlot.ui.roiPlot.getViewBox(), self.mainPlot.ui.histogram.item.vb])
+		# Unregister views before Qt deletes their menus and graphics objects.
+		for view in views:
+			if view.name is None or pg.ViewBox.NamedViews.get(view.name) is view:
+				view.unregister()
+		if hasattr(self, 'mainPlot'):
+			self.mainPlot.close()
+			self.mainPlot.deleteLater()
+		if hasattr(self, 'plot1D'):
+			self.plot1D.clear()
+			self.plot1D.close()
+			self.plot1D.deleteLater()
+		for name in ('Data', 'plotData', 'binned', 'xBins', 'yBins', 'XplotData', 'YplotData'):
+			self.__dict__.pop(name, None)
+		if self.mainWin is not None:
+			for name in ('new1DPlot', 'new2DPlot'):
+				if getattr(self.mainWin, name, None) is self:
+					setattr(self.mainWin, name, None)
+		self.mainWin = None
+
+	def closeEvent(self, e):
+		self.closePlot()
+		super(livePlotWindow, self).closeEvent(e)
+
+	def done(self, result):
+		self.closePlot()
+		super(livePlotWindow, self).done(result)
+
+
+class plot2DWindow(livePlotWindow):
 	def __init__(self, reactor, plotInfo, dir, file, x0, y0, fresh, parent = None):
 		try: 
 			super(plot2DWindow, self).__init__(parent)
@@ -446,6 +582,7 @@ class plot2DWindow(QtWidgets.QDialog):
 			self.oIndex = d = 3-self.plotInfo['operation index']
 			self.z2Index = e = self.plotInfo['z index 2']
 			self.gval = f = self.plotInfo['gval']
+			self.gainEnabled = self.plotInfo.get('gain enabled', self.gval != -1)
 			#print(a,b,c,d,e) #for debuging
 			print("\n\n",d,"\n\n")
 			print('------------------------------')
@@ -460,7 +597,7 @@ class plot2DWindow(QtWidgets.QDialog):
 			self.pxsize = [self.plotInfo['x points'], self.plotInfo['y points']]
 			self.plotTitle = self.plotInfo['title']
 			if self.plotTitle[0:5] == 'Plot ':
-				if self.gval == -1:
+				if not self.gainEnabled:
 					if self.z2Index == 0:
 						self.plotTitle = self.plotInfo['z axis'] + ' vs. ' + self.plotInfo['x axis'] + ' and ' + self.plotInfo['y axis']
 					else: 
@@ -501,28 +638,44 @@ class plot2DWindow(QtWidgets.QDialog):
 			zVals = np.divide(newData[::, z_ind], newData[::, z2_ind], out=np.zeros_like(newData[::, z_ind], dtype=float), where=newData[::, z2_ind]!=0)
 		else:
 			return
-		if self.gval != -1:
+		if self.gainEnabled:
 			zVals = zVals * self.gval
 		self.plotData[xInd, yInd] = zVals
 		
 	@inlineCallbacks
 	def setupListener(self, c):
 		try:
+			if self._closed:
+				return
 			print("setupListener called!")
 			cxnName = 'plot' + str(self.id)
 			from labrad.wrappers import connectAsync
 			self.cxn = yield connectAsync(name = cxnName)
+			if self._closed:
+				self.cxn.disconnect()
+				self.cxn = None
+				return
 			self.dv = yield self.cxn.data_vault
+			if self._closed:
+				return
 			yield self.dv.cd(self.dir)
+			if self._closed:
+				return
 			yield self.dv.open(self.fileName)
+			if self._closed:
+				return
 
 			yield self.addListen(self.reactor)
+			if self._closed:
+				return
 			newData = yield self.dv.get()
+			if self._closed or len(newData) == 0:
+				return
 			print('New Data: ', newData[0])
 			print('Length: ', len(newData))
 			print(self.plotInfo)
 			if len(newData[0]) != 0:
-				if self.gval == -1:
+				if not self.gainEnabled:
 					if self.z2Index == 0:
 						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex])
 						newData = np.delete(np.asarray(newData), inx, axis = 1)
@@ -530,7 +683,6 @@ class plot2DWindow(QtWidgets.QDialog):
 						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.yIndex)[0][0]
 						z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.zIndex)[0][0]
 						newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
-						print(newData[::, x_ind])
 						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
 						self.updatePlotData(newData, x_ind, y_ind, z_ind)
@@ -546,7 +698,6 @@ class plot2DWindow(QtWidgets.QDialog):
 						z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.zIndex)[0][0]
 						z2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.z2Index)[0][0]
 						newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
-						print(newData[::, x_ind])
 						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
 						self.updatePlotData(newData, x_ind, y_ind, z_ind, z2_ind)
@@ -561,7 +712,6 @@ class plot2DWindow(QtWidgets.QDialog):
 						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.yIndex)[0][0]
 						z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.zIndex)[0][0]
 						newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
-						print(newData[::, x_ind])
 						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
 						self.updatePlotData(newData, x_ind, y_ind, z_ind)
@@ -577,7 +727,6 @@ class plot2DWindow(QtWidgets.QDialog):
 						z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.zIndex)[0][0]
 						z2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.z2Index)[0][0]
 						newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
-						print(newData[::, x_ind])
 						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
 						self.updatePlotData(newData, x_ind, y_ind, z_ind, z2_ind)
@@ -586,6 +735,8 @@ class plot2DWindow(QtWidgets.QDialog):
 						self.isData = True	
 			print(self.plotInfo)
 		except Exception as inst:
+			if self._closed:
+				return
 			print('Following error was thrown: ')
 			print(inst)
 			print('Error thrown on line: ')
@@ -593,6 +744,9 @@ class plot2DWindow(QtWidgets.QDialog):
 	@inlineCallbacks
 	def addListen(self, c):
 		yield self.dv.signal__data_available(self.id)
+		if self._closed:
+			return
+		self._listenerAdded = True
 		yield self.dv.addListener(listener=self.updatePlot, ID=self.id)
 		print('2D listener added with ID: ' + str(self.id))
 
@@ -662,11 +816,15 @@ class plot2DWindow(QtWidgets.QDialog):
 	def updatePlot(self, c, signal):
 		print("\nupdatePlot initiated\n")
 		try: 
+			if self._closed:
+				return
 			newData = yield self.dv.get()
+			if self._closed or len(newData) == 0:
+				return
 			start = time.time()
 			print(start)
 			if len(newData[0]) != 0:
-				if self.gval == -1:
+				if not self.gainEnabled:
 					if self.z2Index == 0:
 						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex, self.zIndex])
 						newData = np.delete(np.asarray(newData), inx, axis = 1)
@@ -674,11 +832,12 @@ class plot2DWindow(QtWidgets.QDialog):
 						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.yIndex)[0][0]
 						z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.zIndex)[0][0]
 						newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
-						print(newData[::, x_ind])
 						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
 						self.updatePlotData(newData, x_ind, y_ind, z_ind)
 						yield self.sleep(0.1)
+						if self._closed:
+							return
 						self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, autoHistogramRange = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 						self.isData = True
 					else:
@@ -690,11 +849,12 @@ class plot2DWindow(QtWidgets.QDialog):
 						z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.zIndex)[0][0]
 						z2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.z2Index)[0][0]
 						newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
-						print(newData[::, x_ind])
 						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
 						self.updatePlotData(newData, x_ind, y_ind, z_ind, z2_ind)
 						yield self.sleep(0.1)
+						if self._closed:
+							return
 						self.z2Index +=1
 						self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, autoHistogramRange = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 						self.isData = True
@@ -706,11 +866,12 @@ class plot2DWindow(QtWidgets.QDialog):
 						y_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.yIndex)[0][0]
 						z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex]) == self.zIndex)[0][0]
 						newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
-						print(newData[::, x_ind])
 						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
 						self.updatePlotData(newData, x_ind, y_ind, z_ind)
 						yield self.sleep(0.1)
+						if self._closed:
+							return
 						self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, autoHistogramRange = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 						self.isData = True
 					else:
@@ -722,11 +883,12 @@ class plot2DWindow(QtWidgets.QDialog):
 						z_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.zIndex)[0][0]
 						z2_ind = np.where(np.sort([self.xIndex, self.yIndex, self.zIndex, self.z2Index]) == self.z2Index)[0][0]
 						newData[::, x_ind] = np.digitize(newData[::, x_ind], self.xBins) - 1
-						print(newData[::, x_ind])
 						newData[::, y_ind] = np.digitize(newData[::, y_ind], self.yBins) - 1
 
 						self.updatePlotData(newData, x_ind, y_ind, z_ind, z2_ind)
 						yield self.sleep(0.1)
+						if self._closed:
+							return
 						self.z2Index +=1
 						self.mainPlot.setImage(self.plotData, autoRange = False , autoLevels = False, autoHistogramRange = False, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 						self.isData = True
@@ -821,6 +983,8 @@ class plot2DWindow(QtWidgets.QDialog):
 					self.mainPlot.setImage(self.plotData, autoRange = True , autoLevels = True, pos=[np.min([self.extents[0],self.extents[1]]), np.min([self.extents[2],self.extents[3]])],scale=[self.xscale, self.yscale])
 					self.isData = True"""
 		except Exception as inst:
+			if self._closed:
+				return
 			print('Following error was thrown: ')
 			print(inst)
 			print('Error thrown on line: ')
@@ -840,11 +1004,7 @@ class plot2DWindow(QtWidgets.QDialog):
 		
 		
 
-	def closeEvent(self, e):
-		self.cxn.disconnect()
-		self.close()
-
-class plot1DWindow(QtWidgets.QDialog):
+class plot1DWindow(livePlotWindow):
 	def __init__(self, reactor, plotInfo, dir, file, x0, y0, fresh, parent = None):
 		super(plot1DWindow, self).__init__(parent)
 
@@ -861,16 +1021,19 @@ class plot1DWindow(QtWidgets.QDialog):
 		self.traceCnt = 0
 		self.numLines = 1
 		self.Data = np.array([])
+		self.binned = np.array([], dtype=int)
+		self._traceStep = None
 		self.plotTitle = self.plotInfo['title']
 		self.xIndex = self.plotInfo['x index']
 		self.yIndex = self.plotInfo['y index']
 		self.y2Index = self.plotInfo['y index 2']
 		self.oIndex = 3-self.plotInfo['operation index']
 		self.gvalue = self.plotInfo['gval']
+		self.gainEnabled = self.plotInfo.get('gain enabled', self.gvalue != -1)
 		self.extents = [self.plotInfo['x range'][0], self.plotInfo['x range'][1]]
 		self.pxsize = self.plotInfo['x points']
 		
-		if self.gvalue == -1.0: 
+		if not self.gainEnabled: 
 			if self.y2Index == 0:
 				if self.plotTitle[0:5] == 'Plot ':
 					self.plotTitle = self.plotInfo['y axis'] + ' vs. ' + self.plotInfo['x axis']
@@ -1013,23 +1176,27 @@ class plot1DWindow(QtWidgets.QDialog):
 		else:
 			yVals = data[::, y_ind] + data[::, y2_ind]
 
-		if self.gvalue != -1:
+		if self.gainEnabled:
 			yVals = yVals * self.gvalue
 		return yVals
 
 	def plotTraces(self, x_ind, y_ind, y2_ind = None):
-		xAll = self.Data[::, x_ind]
-		yAll = self.getProcessedYVals(self.Data, y_ind, y2_ind)
-		if len(xAll) == 0:
+		if self._closed or len(self.Data) == 0:
 			return
 
-		segments = [[0, len(xAll)]]
-		if len(self.binned) > 2:
-			breaks = np.argwhere(np.diff(self.binned) != np.diff(self.binned)[0]).flatten()
-			if len(breaks) != 0:
-				starts = [0] + list(breaks + 1)
-				ends = list(breaks + 1) + [len(xAll)]
-				segments = [[starts[i], ends[i]] for i in range(0, len(starts)) if starts[i] < ends[i]]
+		steps = np.diff(self.binned)
+		if self._traceStep is None and len(steps) > 0:
+			self._traceStep = steps[0]
+		starts = np.r_[0, np.flatnonzero(steps != self._traceStep) + 1] if len(steps) > 0 else np.array([0])
+		# Keep all five display choices, with a row limit for data that never resets.
+		keepFrom = max(starts[-5] if len(starts) > 5 else 0, len(self.Data) - 5 * max(1, int(self.pxsize)))
+		if keepFrom > 0:
+			self.Data = self.Data[keepFrom:].copy()
+			self.binned = self.binned[keepFrom:].copy()
+			starts = np.r_[0, starts[starts > keepFrom] - keepFrom]
+		xAll = self.Data[::, x_ind]
+		yAll = self.getProcessedYVals(self.Data, y_ind, y2_ind)
+		segments = list(zip(starts, list(starts[1:]) + [len(xAll)]))
 
 		self.numLines = len(segments)
 		linesToPlot = segments[-(self.traceCnt + 1):]
@@ -1045,20 +1212,36 @@ class plot1DWindow(QtWidgets.QDialog):
 	@inlineCallbacks
 	def setupListener(self, c):
 		try: 
+			if self._closed:
+				return
 			cxnName = 'plot' + str(self.id)
 			from labrad.wrappers import connectAsync
 			self.cxn = yield connectAsync(name = cxnName)
+			if self._closed:
+				self.cxn.disconnect()
+				self.cxn = None
+				return
 			self.dv = yield self.cxn.data_vault
+			if self._closed:
+				return
 			yield self.dv.cd(self.dir)
+			if self._closed:
+				return
 			yield self.dv.open(self.fileName)
+			if self._closed:
+				return
 
 			yield self.addListen(self.reactor)
+			if self._closed:
+				return
 
 			newData = yield self.dv.get()
+			if self._closed or len(newData) == 0:
+				return
 			
 			if len(newData[0]) != 0:
 				y2_ind = None
-				if self.gvalue ==-1:
+				if not self.gainEnabled:
 					if self.y2Index ==0:
 						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex])
 						newData = np.delete(np.asarray(newData), inx, axis = 1)
@@ -1286,6 +1469,8 @@ class plot1DWindow(QtWidgets.QDialog):
 				self.plotTraces(x_ind, y_ind, y2_ind)
 			
 		except Exception as inst:
+			if self._closed:
+				return
 			print('Following error was thrown: ')
 			print(inst)
 			print('Error thrown on line: ')
@@ -1294,17 +1479,25 @@ class plot1DWindow(QtWidgets.QDialog):
 	@inlineCallbacks
 	def addListen(self, c):
 		yield self.dv.signal__data_available(self.id)
+		if self._closed:
+			return
+		self._listenerAdded = True
 		yield self.dv.addListener(listener=self.updatePlot, ID=self.id)
 		print('1D listener added with ID: ' + str(self.id))
 
 	@inlineCallbacks
 	def updatePlot(self, c, signal):
 		try:
+			if self._closed:
+				return
 			newData = yield self.dv.get()
+			if self._closed or len(newData) == 0:
+				return
 			if len(newData[0]) != 0:
-				oldData = copy.copy(self.Data)
+				oldData = self.Data
+				oldBinned = self.binned
 				y2_ind = None
-				if self.gvalue ==-1:
+				if not self.gainEnabled:
 					if self.y2Index ==0:
 						inx = np.delete(np.arange(0, len(newData[0])), [self.xIndex, self.yIndex])
 						newData = np.delete(np.asarray(newData), inx, axis = 1)
@@ -1529,11 +1722,15 @@ class plot1DWindow(QtWidgets.QDialog):
 						else:
 							xVals, yVals = newData[::, x_ind], (newData[::, y_ind]+newData[::, y2_ind])*self.gvalue
 				yield self.sleep(0.1)
+				if self._closed:
+					return
 				if len(oldData) != 0:
 					self.Data = np.vstack((oldData, self.Data))
-					self.binned = np.digitize(self.Data[::, x_ind], self.xBins) - 1
+					self.binned = np.concatenate((oldBinned, self.binned))
 				self.plotTraces(x_ind, y_ind, y2_ind)
 		except Exception as inst:
+			if self._closed:
+				return
 			print('Following error was thrown: ')
 			print(inst)
 			print('Error thrown on line: ')
@@ -1580,11 +1777,80 @@ class plot1DWindow(QtWidgets.QDialog):
 		self.reactor.callLater(secs,d.callback,'Sleeping')
 		return d
 
-	def closeEvent(self, e):
-		self.cxn.disconnect()
-		self.close()
+class savedPlotWindow(QtWidgets.QWidget):
+	closed = QtCore.pyqtSignal(object)
 
-class plotSaved1DWindow(QtWidgets.QWidget):
+	def __init__(self):
+		super(savedPlotWindow, self).__init__()
+		self._closed = False
+		self.cxnS = None
+		self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+
+	@inlineCallbacks
+	def openFile(self, c):
+		try:
+			from labrad.wrappers import connectAsync
+
+			self.cxnS = yield connectAsync()
+			if self._closed:
+				self.cxnS.disconnect()
+				self.cxnS = None
+				return
+			self.dv = yield self.cxnS.data_vault
+			if self._closed:
+				return
+			yield self.dv.cd(self.dir)
+			if self._closed:
+				return
+			yield self.dv.open(self.file)
+			if self._closed:
+				return
+			print('loading data')
+			yield self.loadData(c)
+		except Exception:
+			if not self._closed:
+				import traceback
+				traceback.print_exc()
+
+	@inlineCallbacks
+	def readData(self, columns):
+		# Select columns before retaining chunks; concatenate only once at EOF.
+		chunks = []
+		while not self._closed:
+			line = yield self.dv.get(SAVED_DATA_BATCH_SIZE)
+			if self._closed or len(line) == 0:
+				break
+			chunks.append(np.asarray(line)[:, columns])
+		if self._closed or not chunks:
+			return np.empty((0, len(columns)))
+		return np.concatenate(chunks, axis=0)
+
+	def closeEvent(self, e):
+		if not self._closed:
+			self._closed = True
+			if self.cxnS is not None:
+				self.cxnS.disconnect()
+				self.cxnS = None
+			views = [self.plot1D.getViewBox()]
+			if hasattr(self, 'mainPlot'):
+				views.extend([self.viewBig.getViewBox(), self.mainPlot.ui.roiPlot.getViewBox(), self.mainPlot.ui.histogram.item.vb])
+			# Unregister views before Qt deletes their menus and graphics objects.
+			for view in views:
+				if view.name is None or pg.ViewBox.NamedViews.get(view.name) is view:
+					view.unregister()
+			if hasattr(self, 'mainPlot'):
+				self.mainPlot.close()
+				self.mainPlot.deleteLater()
+			self.plot1D.clear()
+			self.plot1D.close()
+			self.plot1D.deleteLater()
+			for name in ('Data', 'plotData', 'xVals', 'yVals', 'lineXVals', 'lineYVals', 'xBins', 'yBins'):
+				self.__dict__.pop(name, None)
+			self.closed.emit(self)
+		super(savedPlotWindow, self).closeEvent(e)
+
+
+class plotSaved1DWindow(savedPlotWindow):
 	def __init__(self, reactor, file, dir, plotInfo, yMovePos, pencolor):
 		super(plotSaved1DWindow, self).__init__()
 
@@ -1719,17 +1985,6 @@ class plotSaved1DWindow(QtWidgets.QWidget):
 		
 		self.openFile(self.reactor)
 		
-	@inlineCallbacks
-	def openFile(self, c):
-		from labrad.wrappers import connectAsync
-
-		self.cxnS = yield connectAsync()
-		self.dv = yield self.cxnS.data_vault
-		yield self.dv.cd(self.dir)
-		yield self.dv.open(self.file)
-		print('loading data')
-		self.loadData(self.reactor)
-	
 	def sleep(self,secs):
 		d = Deferred()
 		self.reactor.callLater(secs,d.callback,'Sleeping')
@@ -1737,109 +1992,28 @@ class plotSaved1DWindow(QtWidgets.QWidget):
 
 	@inlineCallbacks
 	def loadData(self, c):
-		getFlag = True
-		self.Data = np.array([])
-		while getFlag == True:
-			line = yield self.dv.get(1000)
-
-			try:
-				if len(self.Data) != 0 and len(line) > 0:
-					self.Data = np.vstack((self.Data, line))						
-				elif len(self.Data) == 0 and len(line) > 0:
-					self.Data = np.asarray(line)
-				else:
-					getFlag = False
-			except:
-				getFlag = False
+		columns = [self.xIndex, self.yIndex]
+		if self.y2Index != 0:
+			columns.append(self.y2Index - 1)
+		data = yield self.readData(columns)
+		if self._closed or len(data) == 0:
+			return
+		self.Data = data
+		self.x_ind, self.y_ind, self.y2_ind = 0, 1, 2
 		print('got all data')
-		if self.gain == -1:
-			if self.y2Index == 0:
-				inds =[self.xIndex, self.yIndex]
-				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
-				self.Data = np.delete(self.Data, inx, axis = 1)
-				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
-				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.xVals, self.yVals = self.Data[::, self.x_ind], self.Data[::, self.y_ind]
-			elif self.oIndex == 3: 
-				self.y2Index -=1
-				inds =[self.xIndex, self.yIndex, self.y2Index]
-				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
-				self.Data = np.delete(self.Data, inx, axis = 1)
-				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
-				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.y2_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
-				self.xVals, self.yVals = self.Data[::, self.x_ind], (np.divide(self.Data[::, self.y_ind], self.Data[::, self.y2_ind], out=np.zeros_like(self.Data[::, self.y_ind], dtype=float), where=self.Data[::, self.y2_ind]!=0))
-			elif self.oIndex == 2: 
-				self.y2Index -=1
-				inds =[self.xIndex, self.yIndex, self.y2Index]
-				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
-				self.Data = np.delete(self.Data, inx, axis = 1)
-				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
-				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.y2_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
-				self.xVals, self.yVals = self.Data[::, self.x_ind], self.Data[::, self.y_ind]*self.Data[::, self.y2_ind]
-			elif self.oIndex == 1: 
-				self.y2Index -=1
-				inds =[self.xIndex, self.yIndex, self.y2Index]
-				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
-				self.Data = np.delete(self.Data, inx, axis = 1)
-				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
-				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.y2_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
-				self.xVals, self.yVals = self.Data[::, self.x_ind], self.Data[::, self.y_ind]-self.Data[::, self.y2_ind]
-			else: 
-				self.y2Index -=1
-				inds =[self.xIndex, self.yIndex, self.y2Index]
-				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
-				self.Data = np.delete(self.Data, inx, axis = 1)
-				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
-				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.y2_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
-				self.xVals, self.yVals = self.Data[::, self.x_ind], self.Data[::, self.y_ind]+self.Data[::, self.y2_ind]
+		self.xVals = self.Data[:, self.x_ind]
+		if self.y2Index == 0:
+			self.yVals = self.Data[:, self.y_ind]
+		elif self.oIndex == 3:
+			self.yVals = np.divide(self.Data[:, self.y_ind], self.Data[:, self.y2_ind], out=np.zeros_like(self.Data[:, self.y_ind], dtype=float), where=self.Data[:, self.y2_ind]!=0)
+		elif self.oIndex == 2:
+			self.yVals = self.Data[:, self.y_ind] * self.Data[:, self.y2_ind]
+		elif self.oIndex == 1:
+			self.yVals = self.Data[:, self.y_ind] - self.Data[:, self.y2_ind]
 		else:
-			if self.y2Index == 0:
-				inds =[self.xIndex, self.yIndex]
-				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
-				self.Data = np.delete(self.Data, inx, axis = 1)
-				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
-				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.xVals, self.yVals = self.Data[::, self.x_ind], self.Data[::, self.y_ind]*self.gain
-			elif self.oIndex == 3: 
-				self.y2Index -=1
-				inds =[self.xIndex, self.yIndex, self.y2Index]
-				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
-				self.Data = np.delete(self.Data, inx, axis = 1)
-				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
-				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.y2_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
-				self.xVals, self.yVals = self.Data[::, self.x_ind], (np.divide(self.Data[::, self.y_ind], self.Data[::, self.y2_ind], out=np.zeros_like(self.Data[::, self.y_ind], dtype=float), where=self.Data[::, self.y2_ind]!=0))*self.gain
-			elif self.oIndex == 2: 
-				self.y2Index -=1
-				inds =[self.xIndex, self.yIndex, self.y2Index]
-				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
-				self.Data = np.delete(self.Data, inx, axis = 1)
-				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
-				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.y2_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
-				self.xVals, self.yVals = self.Data[::, self.x_ind], self.Data[::, self.y_ind]*self.Data[::, self.y2_ind]*self.gain
-			elif self.oIndex == 1: 
-				self.y2Index -=1
-				inds =[self.xIndex, self.yIndex, self.y2Index]
-				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
-				self.Data = np.delete(self.Data, inx, axis = 1)
-				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
-				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.y2_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
-				self.xVals, self.yVals = self.Data[::, self.x_ind], (self.Data[::, self.y_ind]-self.Data[::, self.y2_ind])*self.gain
-			else: 
-				self.y2Index -=1
-				inds =[self.xIndex, self.yIndex, self.y2Index]
-				inx = np.delete(np.arange(0, len(self.Data[0])), inds)
-				self.Data = np.delete(self.Data, inx, axis = 1)
-				self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
-				self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-				self.y2_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
-				self.xVals, self.yVals = self.Data[::, self.x_ind], (self.Data[::, self.y_ind]+self.Data[::, self.y2_ind])*self.gain
+			self.yVals = self.Data[:, self.y_ind] + self.Data[:, self.y2_ind]
+		if self.gain != -1:
+			self.yVals = self.yVals * self.gain
 		
 		self.plot1D.plot(x = self.xVals, y = self.yVals, pen =pg.mkPen(color=self.penColor))
 		
@@ -1966,7 +2140,7 @@ class plotSaved1DWindow(QtWidgets.QWidget):
 		if self.noteEdits.accepted:
 			self.notes = self.noteEdits.textEditor.toPlainText()
 		
-class plotSaved2DWindow(QtWidgets.QWidget):
+class plotSaved2DWindow(savedPlotWindow):
 	def __init__(self, reactor, file, dir, plotInfo, yMovePos ):
 		super(plotSaved2DWindow, self).__init__()
 
@@ -2190,18 +2364,6 @@ class plotSaved2DWindow(QtWidgets.QWidget):
 			self.updatePlot1D(pos,'x')
 			
 		
-	@inlineCallbacks
-	def openFile(self, c):
-		print("\nopenFile Initiated!\n")
-		from labrad.wrappers import connectAsync
-
-		self.cxnS = yield connectAsync()
-		self.dv = yield self.cxnS.data_vault
-		yield self.dv.cd(self.dir)
-		yield self.dv.open(self.file)
-		print('loading data')
-		self.loadData(self.reactor)
-	
 	def sleep(self,secs):
 		d = Deferred()
 		self.reactor.callLater(secs,d.callback,'Sleeping')
@@ -2210,46 +2372,24 @@ class plotSaved2DWindow(QtWidgets.QWidget):
 	@inlineCallbacks
 	def loadData(self, c):
 		print("\nloadData Initiated!\n")
-		getFlag = True
-		self.Data = np.array([])
-		while getFlag == True:
-			line = yield self.dv.get(1000)
-
-			try:
-				if len(self.Data) != 0 and len(line) > 0:
-					self.Data = np.vstack((self.Data, line))						
-				elif len(self.Data) == 0 and len(line) > 0:
-					self.Data = np.asarray(line)
-				else:
-					getFlag = False
-			except:
-				getFlag = False
-		print('got all data')
-		import time
 		start = time.time()
-		if self.z2Index !=0:
-			inds =[self.xIndex, self.yIndex, self.zIndex, self.z2Index-1]
-			inx = np.delete(np.arange(0, len(self.Data[0])), inds)
-			self.Data = np.delete(self.Data, inx, axis = 1)
-			self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
-			self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-			self.z_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
-			self.z2_ind = np.argwhere(np.sort(inds) == inds[3])[0][0]
-			end = time.time()
-		else:
-			inds =[self.xIndex, self.yIndex, self.zIndex]
-			inx = np.delete(np.arange(0, len(self.Data[0])), inds)
-			self.Data = np.delete(self.Data, inx, axis = 1)
-			self.x_ind = np.argwhere(np.sort(inds) == inds[0])[0][0]
-			self.y_ind = np.argwhere(np.sort(inds) == inds[1])[0][0]
-			self.z_ind = np.argwhere(np.sort(inds) == inds[2])[0][0]
-			end = time.time()
-		print("Time taken to process data: ",end-start) #for debugging
+		columns = [self.xIndex, self.yIndex, self.zIndex]
+		if self.z2Index != 0:
+			columns.append(self.z2Index - 1)
+		data = yield self.readData(columns)
+		if self._closed or len(data) == 0:
+			return
+		self.Data = data
+		self.x_ind, self.y_ind, self.z_ind, self.z2_ind = 0, 1, 2, 3
+		print('got all data')
+		print("Time taken to load data: ", time.time()-start)
 		#self.xData = self.Data[::, self.xIndex]
 		#self.yData = self.Data[::, self.yIndex]
 		print(self.oIndex, self.gain)
 		print("\n\n")
 		params = yield self.dv.get_parameters()
+		if self._closed:
+			return
 					
 		if params != None:
 			params = dict((x,y) for x,y in params)		
@@ -2665,7 +2805,6 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 		#2 comes from saved
 		
 		super(plotSetup, self).__init__(parent)
-		QtWidgets.QDialog.__init__(self)
 
 		self.reactor = reactor
 		self.file = str(file)
@@ -2875,7 +3014,7 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 		gval2.setText(self.gainInput2.text())
 		newItems = [lbl, xAx, yAx, op, yAx2, gval2]
 		
-		if self.gainInput2.text().replace(" ","")=="" or self.gainInput2.text().replace(" ","")=="0":
+		if self.gainInput2.text().strip() == "" or (self.fresh == 2 and self.gainInput2.text().strip() == "0"):
 			plotInfo = {'title': title,
 						'x axis': str(self.x1.currentText()), 
 						'x index': self.x1.currentIndex(),
@@ -2899,6 +3038,8 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 						'operation index': self.o2.currentIndex(),
 						'gval':float(self.gainInput2.text().replace(" ","")),
 						}
+		if self.fresh != 2:
+			plotInfo['gain enabled'] = bool(self.gainInput2.text().strip())
 		self.plot1DInfo[self.num1Plots] = plotInfo
 		
 		for i in range(0, 6):
@@ -2924,7 +3065,7 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 		#gval = setText(self.())
 		
 		newItems = [lbl, xAx, yAx, zAx, o, zAx2, gval]
-		if self.gainInput.text().replace(" ","")=="" or self.gainInput.text().replace(" ","")=="0":
+		if self.gainInput.text().strip() == "" or (self.fresh == 2 and self.gainInput.text().strip() == "0"):
 			plotInfo = {'title': title,
 					'x axis': str(self.x2.currentText()), 
 					'x index': self.x2.currentIndex(),
@@ -2954,6 +3095,8 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 					}
 		
 		
+		if self.fresh != 2:
+			plotInfo['gain enabled'] = bool(self.gainInput.text().strip())
 		self.plot2DInfo[self.num2Plots] = plotInfo
 		
 		for i in range(0, 7):
@@ -3114,7 +3257,7 @@ class plotSetup(QtWidgets.QDialog, Ui_PlotSetup):
 						print('2D Info: ', self.plot2DInfo)
 						print('1D Info: ', self.plot1DInfo)
 						if self.fresh == 0 or self.fresh == 1:
-							yield self.mainWin.openLivePlots(copy.copy(self.plot2DInfo), copy.copy(self.plot1DInfo), copy.copy(self.fresh))
+							yield self.mainWin.openLivePlots(copy.copy(self.plot2DInfo), copy.copy(self.plot1DInfo), copy.copy(self.fresh), directory=self.dir, file=self.file)
 							yield self.sleep(0.5)
 							self.close()
 			except Exception as inst:
@@ -3281,11 +3424,10 @@ class dirExplorer(QtWidgets.QDialog, Ui_DirExp):
 class dataVaultExplorer(QtWidgets.QDialog, Ui_DataVaultExp):
 	def __init__(self, reactor, source, listenDir, parent = None):
 		super(dataVaultExplorer, self).__init__(parent)
-		QtWidgets.QDialog.__init__(self)
 
 		self.reactor = reactor
 		self.source = source
-		self.listenDir = listenDir
+		self.listenDir = list(listenDir)
 		self.setupUi(self)
 		self.moveDefault()
 		
@@ -3297,7 +3439,7 @@ class dataVaultExplorer(QtWidgets.QDialog, Ui_DataVaultExp):
 
 		self.selectedFile = ''
 		self.selectedDir = ['']
-		self.currentDir = self.listenDir
+		self.currentDir = list(self.listenDir)
 		print('Setting directory: ', self.currentDir)
 
 		self.dirList.itemDoubleClicked.connect(self.updateDirs)
@@ -3384,7 +3526,7 @@ class dataVaultExplorer(QtWidgets.QDialog, Ui_DataVaultExp):
 		file = self.fileList.currentItem()
 		self.selectedFile = file.text()
 		
-		self.selectedDir = self.currentDir
+		self.selectedDir = list(self.currentDir)
 		self.currentFile.setText(file.text())
 		
 	def selectFile(self):
@@ -3397,8 +3539,6 @@ class dataVaultExplorer(QtWidgets.QDialog, Ui_DataVaultExp):
 				pass
 		elif self.source == 'live':
 			if self.selectedFile != '':
-				self.mainWin.listenPlotFile = str(self.selectedFile)
-				self.mainWin.listenTo = self.selectedDir
 				print('Doing this')
 				self.livePlot = plotSetup(self.reactor,self.selectedFile, self.selectedDir, self.cxn, self.dv, 1, self.mainWin)
 				self.accept()
